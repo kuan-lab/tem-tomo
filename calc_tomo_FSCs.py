@@ -9,8 +9,8 @@ from resolution_measure_mrc import *
 num_cores = 8
 cube_size = 100
 sub_region = 200
-num_angs = [121, 33]
-max_angs = [60, 30]
+num_angs = [121, 33, 21, 11]
+max_angs = [60, 40, 30, 20]
 output_dir = 'FSC_test'
 #fake = True
 fake = False

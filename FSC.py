@@ -12,7 +12,7 @@ the threshold funcion T of 1 or 1/2 bit.
 from __future__ import division, print_function
 import numpy as np
 from numpy import meshgrid
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 __all__ = ['FourierShellCorr', 'FSCPlot', 'HannApod']
 
