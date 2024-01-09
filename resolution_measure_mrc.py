@@ -141,7 +141,7 @@ def resolution_measure(vol1, vol2, num_cores, cube_size, \
         of = open(ofn,'w')
         for r in ret:
             tl = "%s, %s, %s"%r['center']
-            of.write("%s, %s %s\n"%(tl,r['resolution'],r['mean_pix']))
+            of.write("%s, %s, %s\n"%(tl,r['resolution'],r['mean_pix']))
     else:
         print("Running parameter sweep")
         par_args = []

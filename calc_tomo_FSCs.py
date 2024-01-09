@@ -9,7 +9,7 @@ from resolution_measure_mrc import *
 num_cores = 8
 cube_size = 100
 sub_region = 200
-num_angs = [121, 33, 21, 11]
+num_angs = [121, 33, 11]
 max_angs = [60, 40, 30]
 output_dir = 'FSC_test'
 #fake = True
@@ -46,7 +46,7 @@ for index,row in df.iterrows():
 			else:
 				print(os.listdir(b_dir))
 				sys.exit('tomo dir does not have exactly 1 output file')
-			ofn = os.sep.join([output_dir, 'FSC3D_%s_%s_%i-limited[%.1f_-%.1f]' % (thickness, tomo,num_ang,max_ang,max_ang)])
+			ofn = os.sep.join([output_dir, 'FSC3D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
 			print('Calculating FSC for %s' % ofn)
 			if not os.path.exists(output_dir):
 				os.makedirs(output_dir)
