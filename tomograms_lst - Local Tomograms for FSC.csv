@@ -1,6 +1,7 @@
-Tomogram,Label,PID,EXPID,MPID,ccdbprod,Thickness,Series,Tilts/Series,Magnification,Scope/Detector,,PIxel Size (A),Pixel Size bin 4 (nm),FSC res (vxl),Notes,
-MouseCerebellum_A6S1_SA3.3k_de64_tomo1,A6S1#1,20471,5403572,5403638,28,1.5um,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,3.75,121 60deg a/b,231221
-MouseCerebellum_A5S1_SA3.3k_de64_tomo1,A5S1#1,20471,5403572,5403625,28,1.25um,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,,,
-MouseCerebellum_A4S1_SA3.3k_de64_tomo1,A4S1#1,20471,5403572,5403612,28,1um,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,,,
-MouseCerebellum_A3S1_SA3.3k_de64_tomo1,A3S1#1,20471,5403572,5403599,28,750nm,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,,,
-MouseCerebellum_A2S1_SA3.3k_de64_tomo2,A2S1#2,20471,5403572,5403586,28,500nm,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,,,
+Tomogram,Label,PID,EXPID,MPID,ccdbprod,Thickness,Series,Tilts/Series,Magnification,Scope/Detector,,PIxel Size (A),Pixel Size bin 4 (nm),Notes
+MouseCerebellum_A6S1_SA3.3k_de64_tomo1,A6S1#1,20471,5403572,5403638,28,1.5um,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,ok
+MouseCerebellum_A5S1_SA3.3k_de64_tomo1,A5S1#1,20471,5403572,5403625,28,1.25um,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,ok
+MouseCerebellum_A4S1_SA3.3k_de64_tomo1,A4S1#1,20471,5403572,5403612,28,1um,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,ok
+MouseCerebellum_A3S1_SA3.3k_de64_tomo2,A3S1#2,20471,5403572,5403599,28,750nm,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,
+MouseCerebellum_A2S1_SA3.3k_de64_tomo2,A2S1#2,20471,5403572,5403586,28,500nm,,481,3.3k,Halo/DE64,fpb-bin4,12.27,4.908,
+MouseCerebellum_A1S1_SA3.3k_de64_tomo2,A1S1#2,20471,5403572,5403573,28,250nm,,241,3.3k,Halo/DE64,fpb-bin4,12.27,,
