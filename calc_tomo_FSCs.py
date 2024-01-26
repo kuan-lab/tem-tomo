@@ -6,12 +6,12 @@ import os
 from resolution_measure_mrc import *
 
 ####### Edit these params
-num_cores = 8
-cube_size = 100
-sub_region = 200
-num_angs = [121, 33, 11]
-max_angs = [60, 40, 30]
-output_dir = 'FSC_test'
+num_cores = 16
+cube_size = 300
+sub_region = -1
+num_angs = [33, 17, 5]
+max_angs = [60, 40, 20, 10]
+output_dir = '240115_FSC3D_300cube'
 #fake = True
 fake = False
 overwrite = False
@@ -38,18 +38,20 @@ for index,row in df.iterrows():
 			if len(os.listdir(a_dir)) == 1:
     				a_path = os.sep.join([a_dir,os.listdir(a_dir)[0]])
 			else:  				
-				print(os.listdir(a_dir))
-				sys.exit('tomo does not have exactly 1 output file')	
+				print('Problem dir: %s' % os.listdir(a_dir))
+				fake = True
+				# sys.exit('tomo does not have exactly 1 output file')	
 			b_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]_fsc-b' % (num_ang,max_ang,max_ang)])
 			if len(os.listdir(b_dir)) == 1:
     				b_path = os.sep.join([b_dir,os.listdir(a_dir)[0]])
 			else:
-				print(os.listdir(b_dir))
-				sys.exit('tomo dir does not have exactly 1 output file')
+				print('Problem dir: %s' % os.listdir(b_dir))
+				#sys.exit('tomo dir does not have exactly 1 output file')
+				fake = True
 			ofn = os.sep.join([output_dir, 'FSC3D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
-			print('Calculating FSC for %s' % ofn)
 			if not os.path.exists(output_dir):
 				os.makedirs(output_dir)
+			print('Calculating FSC for %s' % ofn)
 			if not fake:
 				if overwrite or not os.path.isfile(ofn):		
 					resolution_measure(a_path, b_path, num_cores, cube_size, pixel_size = pixel_size, sub_region = sub_region, ofn=ofn)
