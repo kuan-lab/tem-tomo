@@ -81,7 +81,7 @@ def makedir(dn):
         os.makedirs(dn)
 
 def resolution_measure(vol1, vol2, num_cores, cube_size, \
-    project_name='FSC', sub_region=-1, use_json=False, \
+    project_name='FSC', sub_region=-1, sub_region_zxy = None, use_json=False, \
     snrt = 0.2071, pixel_size = 1, param_sweep=False, \
     ofn = None):
     makedir(project_name)
@@ -97,6 +97,13 @@ def resolution_measure(vol1, vol2, num_cores, cube_size, \
         z_size = sub_region
         x_size = sub_region
         y_size = sub_region
+    elif sub_region_zxy is not None:
+        z_st = (z_size - sub_region_zxy[0])//2
+        x_st = (x_size - sub_region_zxy[1])//2
+        y_st = (y_size - sub_region_zxy[2])//2
+        z_size = sub_region_zxy[0]
+        x_size = sub_region_zxy[1]
+        y_size = sub_region_zxy[2]
     
     tmp = dict()
     
