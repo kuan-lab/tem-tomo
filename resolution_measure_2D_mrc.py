@@ -121,39 +121,39 @@ def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
     print("Base arguments: %s"%tmp) 
     if cutout_size > 0:
         if plane == 'beam':
-            for k in range(z_st,z_st + z_size+1,slice_step):
-                for i in range( x_st, x_st + x_size - cutout_size+1, cutout_size):
-                    for j in range( y_st, y_st + y_size - cutout_size+1, cutout_size):
+            for k in range(z_st,z_st + z_size,slice_step):
+                for i in range( x_st, x_st + x_size - cutout_size, cutout_size):
+                    for j in range( y_st, y_st + y_size - cutout_size, cutout_size):
                         tmp['top_left'] = (k,i,j) 
                         par_args.append(tmp.copy())
         elif plane == 'tilt': 
-            for i in range( x_st, x_st + x_size + 1, slice_step):
-                for j in range( y_st, y_st + y_size - cutout_size+1, cutout_size):
-                    for k in range(z_st,z_st + z_size - cutout_size+1, cutout_size):
+            for i in range( x_st, x_st + x_size, slice_step):
+                for j in range( y_st, y_st + y_size - cutout_size, cutout_size):
+                    for k in range(z_st,z_st + z_size - cutout_size, cutout_size):
                         tmp['top_left'] = (k,i,j) 
                         par_args.append(tmp.copy())
         elif plane == 'edge':
-            for j in range( y_st, y_st + y_size +1, slice_step):
-                for i in range( x_st, x_st + x_size - cutout_size+1, cutout_size):
-                    for k in range(z_st,z_st + z_size-cutout_size+1,cutout_size):
+            for j in range( y_st, y_st + y_size, slice_step):
+                for i in range( x_st, x_st + x_size - cutout_size, cutout_size):
+                    for k in range(z_st,z_st + z_size-cutout_size,cutout_size):
                         tmp['top_left'] = (k,i,j) 
                         par_args.append(tmp.copy())
 
     else: # Use whole image
         if plane == 'beam':
-            for k in range(z_st,z_st + z_size+1,slice_step):
+            for k in range(z_st,z_st + z_size,slice_step):
                 i = x_st
                 j = y_st
                 tmp['top_left'] = (k,i,j) 
                 par_args.append(tmp.copy())
         elif plane == 'tilt': 
-            for i in range( x_st, x_st + x_size + 1, slice_step):
+            for i in range( x_st, x_st + x_size, slice_step):
                 j = y_st
                 k = z_st 
                 tmp['top_left'] = (k,i,j) 
                 par_args.append(tmp.copy())
         elif plane == 'edge':
-            for j in range( y_st, y_st + y_size +1, slice_step):
+            for j in range( y_st, y_st + y_size, slice_step):
                 i = x_st
                 k = z_st
                 tmp['top_left'] = (k,i,j) 

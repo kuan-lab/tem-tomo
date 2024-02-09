@@ -4,27 +4,30 @@ import time
 import pandas as pd
 import os
 from resolution_measure_2D_mrc import *
+from glob import glob
 
 ####### Edit these params
 num_cores = 24
 cutout_size = -1
 sub_region = -1
-num_angs = [33, 17, 5]
-max_angs = [60, 40, 20, 10]
+num_angs = [121, 33, 21, 5]
+max_angs = [60, 40, 20]
 plane = 'beam'
-output_dir = '240126_FSC2D_' + plane
+output_dir = '240207_dtFSC2D_' + plane
 slice_step = 2
-fake = True
-#fake = False
+#fake = True
+fake = False
 #overwrite = False
 overwrite = True
 ###########
 
 # Working with file structure to analyze multiple datasets
-
+home_dir = '/home/atk13/repos/tem-tomo'
 #data_path = '/Users/atk42/OneDrive - Yale University/Lab/Projects/TEM_tomo/tomo_data'
-data_path = '/home/atk13/new_project_20471'
-tomo_lst = 'tomograms_lst - Local Tomograms for FSC.csv'
+#data_path = '/home/atk13/new_project_20471'
+data_path = '/ccdbprod/ccdbprod29/home/CCDB_DATA_USER.portal/CCDB_DATA_USER/acquisition/project_20471/'
+#tomo_lst = 'tomograms_lst - Local Tomograms for FSC.csv'
+tomo_lst = 'tomograms_lst - double_tilt_tomos.csv'
 
 df = pd.read_csv(tomo_lst)
 
@@ -37,21 +40,25 @@ for index,row in df.iterrows():
 	tomo_path = os.sep.join([data_path, proj, 'processed_data',tomo,'txbr-backprojection','limited-bin4'])
 	for num_ang in num_angs:
 		for max_ang in max_angs:
-			a_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]_fsc-a' % (num_ang,max_ang,max_ang)])
-			if len(os.listdir(a_dir)) == 1:
-    				a_path = os.sep.join([a_dir,os.listdir(a_dir)[0]])
-			else:  				
-				print('Problem dir: %s' % os.listdir(a_dir))
+			recon_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]' % (num_ang,max_ang,max_ang)])
+			os.chdir(recon_dir)
+			a_paths = glob(tomo+'a_z_-*0.out')
+			if len(a_paths) != 1:
+				print('Problem dir for a recon: %s' % recon_dir)
+				print(a_path)
 				fake = True
-				# sys.exit('tomo does not have exactly 1 output file')	
-			b_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]_fsc-b' % (num_ang,max_ang,max_ang)])
-			if len(os.listdir(b_dir)) == 1:
-    				b_path = os.sep.join([b_dir,os.listdir(a_dir)[0]])
 			else:
-				print('Problem dir: %s' % os.listdir(b_dir))
-				#sys.exit('tomo dir does not have exactly 1 output file')
+				a_path = os.sep.join([recon_dir, a_paths[0]])
+			b_paths = glob(tomo+'b_z_-*0.out')
+			if len(b_paths) != 1:
+				print('Problem dir for b recon : %s' % recon_dir)
+				print(b_path)
 				fake = True
-			ofn = os.sep.join([output_dir, 'FSC3D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
+			else:
+				b_path = os.sep.join([recon_dir, b_paths[0]])
+			ofn = os.sep.join([output_dir, 'dtFSC2D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
+			os.chdir(home_dir)
+
 			if not os.path.exists(output_dir):
 				os.makedirs(output_dir)
 			print('Calculating FSC for %s' % ofn)

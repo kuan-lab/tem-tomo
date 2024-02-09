@@ -7,11 +7,12 @@ from resolution_measure_mrc import *
 
 ####### Edit these params
 num_cores = 16
-cube_size = 300
+cube_size = 100
+sub_sampling_zxy = [1,4,4]
 sub_region = -1
 num_angs = [33, 17, 5]
-max_angs = [60, 40, 20, 10]
-output_dir = '240115_FSC3D_300cube'
+max_angs = [60,30, 10]
+output_dir = '240126_FSC3D_100cube_subsamp'
 #fake = True
 fake = False
 overwrite = False
@@ -54,4 +55,4 @@ for index,row in df.iterrows():
 			print('Calculating FSC for %s' % ofn)
 			if not fake:
 				if overwrite or not os.path.isfile(ofn):		
-					resolution_measure(a_path, b_path, num_cores, cube_size, pixel_size = pixel_size, sub_region = sub_region, ofn=ofn)
+					resolution_measure(a_path, b_path, num_cores, cube_size, pixel_size = pixel_size, sub_region = sub_region, sub_sampling_zxy = sub_sampling_zxy, ofn=ofn)

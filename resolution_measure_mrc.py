@@ -46,7 +46,8 @@ def parallel_FSC_worker(a):
             FSC3Dvol.save_fig(a['prefix'])
     else:
         a['resolution'] = -1
-        
+    my_corr_coef = np.corrcoef(np.ndarray.flatten(v1[z:z+s,x:x+s,y:y+s]),np.ndarray.flatten(v2[z:z+s,x:x+s,y:y+s]))   
+    a['corr'] = my_corr_coef[0,1]
     return a.copy()
     
 def sweep_param(param_name, r, base_args,proj_name):
@@ -141,7 +142,7 @@ def resolution_measure(vol1, vol2, num_cores, cube_size, \
         of = open(ofn,'w')
         for r in ret:
             tl = "%s, %s, %s"%r['center']
-            of.write("%s, %s, %s\n"%(tl,r['resolution'],r['mean_pix']))
+            of.write("%s, %s, %s, %s\n"%(tl,r['resolution'],r['mean_pix'],r['corr']))
     else:
         print("Running parameter sweep")
         par_args = []
