@@ -90,14 +90,25 @@ def resolution_measure(vol1, vol2, num_cores, cube_size, \
     z_st,x_st,y_st = (0,0,0)
     with mrcfile.open(vol1) as mrc:
         z_size,x_size,y_size = mrc.data.shape
-
-    if sub_region > 0:
-        z_st = (z_size - sub_region)//2
-        x_st = (x_size - sub_region)//2
-        y_st = (y_size - sub_region)//2
-        z_size = sub_region
-        x_size = sub_region
-        y_size = sub_region
+    if len(sub_region) == 3:
+        if sub_region[0] > 0:
+            z_st = (z_size - sub_region[0])//2
+            z_size = sub_region[0]
+        if sub_region[1] > 0:        
+            x_st = (x_size - sub_region[1])//2
+            x_size = sub_region[1] 
+        if sub_region[2] > 0:       
+            y_st = (y_size - sub_region[2])//2
+            y_size = sub_region[2]
+	
+    elif len(sub_region == 1):
+        if sub_region > 0:
+             z_st = (z_size - sub_region)//2
+             x_st = (x_size - sub_region)//2
+             y_st = (y_size - sub_region)//2
+             z_size = sub_region
+             x_size = sub_region
+             y_size = sub_region
     
     tmp = dict()
     

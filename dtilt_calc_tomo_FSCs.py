@@ -13,11 +13,11 @@ sub_sampling_zxy = [1,4,4]
 sub_region = -1
 num_angs = [121, 33, 21, 5]
 max_angs = [60,40,20]
-output_dir = '240207_dtFSC3D_100cube_subsamp'
+output_dir = '240223_dtbdFSC3D_100cube_subsamp'
 #fake = True
 fake = False
-#overwrite = False
-overwrite = True
+overwrite = False
+#overwrite = True
 ###########
 
 
@@ -42,21 +42,21 @@ for index,row in df.iterrows():
 		for max_ang in max_angs:
 			recon_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]' % (num_ang,max_ang,max_ang)])
 			os.chdir(recon_dir)
-			a_paths = glob(tomo+'a_z_-*0.out')
+			a_paths = glob(tomo+'b_z_-*0.out')
 			if len(a_paths) != 1:
 				print('Problem dir for a recon: %s' % recon_dir)
 				print(a_path)
 				fake = True
 			else:
 				a_path = os.sep.join([recon_dir, a_paths[0]])
-			b_paths = glob(tomo+'b_z_-*0.out')
+			b_paths = glob(tomo+'d_z_-*0.out')
 			if len(b_paths) != 1:
 				print('Problem dir for b recon : %s' % recon_dir)
 				print(b_path)
 				fake = True
 			else:
 				b_path = os.sep.join([recon_dir, b_paths[0]])
-			ofn = os.sep.join([output_dir, 'dtFSC3D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
+			ofn = os.sep.join([output_dir, 'FSC3D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
 			os.chdir(home_dir)
 			if not os.path.exists(output_dir):
 				os.makedirs(output_dir)
