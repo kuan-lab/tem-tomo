@@ -7,13 +7,13 @@ from resolution_measure_mrc import *
 from glob import glob
 
 ####### Edit these params
-num_cores = 9
+num_cores = 16
 cube_size = 100
-sub_sampling_zxy = [1,8,8]
+sub_sampling_zxy = [1,4,4]
 sub_region = [100, -1,-1]
-num_angs = [121, 33, 21, 5]
-max_angs = [60,40,20]
-output_dir = '240228_baRef_FSC3D_100cube_subsamp'
+num_angs = [121, 33, 21, 17, 11, 5]
+max_angs = [60,50,40,30,20,10]
+output_dir = '240301_baRef_FSC3D_100cube_subsamp4'
 #fake = True
 fake = False
 #overwrite = False
@@ -40,6 +40,8 @@ for index,row in df.iterrows():
 	tomo_path = os.sep.join([data_path, proj, 'processed_data',tomo,'txbr-backprojection','limited-bin4'])
 	for num_ang in num_angs:
 		for max_ang in max_angs:
+			if num_ang == 121 and max_ang == 10:
+				continue
 			recon_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]' % (num_ang,max_ang,max_ang)])
 			os.chdir(recon_dir)
 			a_paths = glob(tomo+'b_z_-*0.out')
