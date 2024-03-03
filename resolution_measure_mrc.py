@@ -164,7 +164,8 @@ def resolution_measure(vol1, vol2, num_cores, cube_size, \
         par_args.extend(sweep_param('rt',range(2,14,2),tmp,project_name))
         print("Running across %s cores"%num_cores)
         pool.map(parallel_FSC_worker, par_args)
-
+    pool.close()
+	
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("vol1",help="fn of first mrc volume")
