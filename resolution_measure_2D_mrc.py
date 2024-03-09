@@ -63,6 +63,8 @@ def parallel_FSC_worker(a):
             FSCvol.save_fig(a['prefix'])
     else:
         a['resolution'] = -1
+    my_corr_coef = np.corrcoef(np.ndarray.flatten(v1c),np.ndarray.flatten(v2c))   
+    a['corr'] = my_corr_coef[0,1]
     return a.copy()
     
 
@@ -92,7 +94,7 @@ def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
         z_size = sub_region
         x_size = sub_region
         y_size = sub_region
-    
+    mrc.close()
     tmp = dict()
     
     if os.path.exists("%s/default.json"%project_name) and use_json:
@@ -170,3 +172,4 @@ def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
     for r in ret:
         tl = "%s, %s, %s"%r['center']
         of.write("%s, %s, %s\n"%(tl,r['resolution'],r['mean_pix']))
+    of.close()
