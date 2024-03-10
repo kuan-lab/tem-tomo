@@ -65,6 +65,7 @@ def parallel_FSC_worker(a):
         a['resolution'] = -1
     my_corr_coef = np.corrcoef(np.ndarray.flatten(v1c),np.ndarray.flatten(v2c))   
     a['corr'] = my_corr_coef[0,1]
+    mrc.close()
     return a.copy()
     
 
@@ -173,3 +174,4 @@ def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
         tl = "%s, %s, %s"%r['center']
         of.write("%s, %s, %s\n"%(tl,r['resolution'],r['mean_pix']))
     of.close()
+    pool.close()

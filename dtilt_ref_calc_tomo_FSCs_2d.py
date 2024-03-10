@@ -9,13 +9,14 @@ from glob import glob
 ####### Edit these params
 num_cores = 16
 sub_region = -1
+cutout_size = -1
 num_angs = [121, 33, 21, 17, 11, 5]
 max_angs = [60,50,40,30,20,10]
 plane = 'beam'
 output_dir = '240309_baRef_FSC2D_subsamp4_' + plane
 slice_step = 4
 #fake = True
-fake = True
+fake = False
 #overwrite = False
 overwrite = True
 ###########
