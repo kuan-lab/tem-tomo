@@ -9,11 +9,11 @@ from glob import glob
 ####### Edit these params
 num_cores = 16
 cube_size = 100
-sub_sampling_zxy = [1,4,4]
+sub_sampling_zxy = [1,1,1]
 sub_region = [100, -1,-1]
 num_angs = [121, 33, 21, 17, 11, 5]
 max_angs = [60,50,40,30,20,10]
-output_dir = '240301_baRef_FSC3D_100cube_subsamp4'
+output_dir = '240302_baRef_FSC3D_100cube'
 #fake = True
 fake = False
 #overwrite = False

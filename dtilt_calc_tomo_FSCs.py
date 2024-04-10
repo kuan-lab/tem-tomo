@@ -10,10 +10,10 @@ from glob import glob
 num_cores = 16
 cube_size = 100
 sub_sampling_zxy = [1,4,4]
-sub_region = -1
-num_angs = [121, 33, 21, 5]
-max_angs = [60,40,20]
-output_dir = '240223_dtbdFSC3D_100cube_subsamp'
+sub_region = [100, -1, -1]
+num_angs = [121, 33, 21, 17, 11, 5]
+max_angs = [60,50,40,30,20,10]
+output_dir = '240410_dtabFSC3D_100cube_subsamp_1bit'
 #fake = True
 fake = False
 overwrite = False
@@ -40,16 +40,18 @@ for index,row in df.iterrows():
 	tomo_path = os.sep.join([data_path, proj, 'processed_data',tomo,'txbr-backprojection','limited-bin4'])
 	for num_ang in num_angs:
 		for max_ang in max_angs:
+			if num_ang == 121 and max_ang == 10:
+                                continue
 			recon_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]' % (num_ang,max_ang,max_ang)])
 			os.chdir(recon_dir)
-			a_paths = glob(tomo+'b_z_-*0.out')
+			a_paths = glob(tomo+'a_z_-*0.out')
 			if len(a_paths) != 1:
 				print('Problem dir for a recon: %s' % recon_dir)
 				print(a_path)
 				fake = True
 			else:
 				a_path = os.sep.join([recon_dir, a_paths[0]])
-			b_paths = glob(tomo+'d_z_-*0.out')
+			b_paths = glob(tomo+'b_z_-*0.out')
 			if len(b_paths) != 1:
 				print('Problem dir for b recon : %s' % recon_dir)
 				print(b_path)
@@ -63,4 +65,4 @@ for index,row in df.iterrows():
 			print('Calculating FSC for %s' % ofn)
 			if not fake:
 				if overwrite or not os.path.isfile(ofn):		
-					resolution_measure(a_path, b_path, num_cores, cube_size, pixel_size = pixel_size, sub_region = sub_region, sub_sampling_zxy = sub_sampling_zxy, ofn=ofn)
+					resolution_measure(a_path, b_path, num_cores, cube_size, snrt=0.5, pixel_size = pixel_size, sub_region = sub_region, sub_sampling_zxy = sub_sampling_zxy, ofn=ofn)
