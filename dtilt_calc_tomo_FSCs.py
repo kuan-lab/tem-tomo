@@ -13,7 +13,7 @@ sub_sampling_zxy = [1,4,4]
 sub_region = [100, -1, -1]
 num_angs = [121, 33, 21, 17, 11, 5]
 max_angs = [60,50,40,30,20,10]
-output_dir = '240410_dtabFSC3D_100cube_subsamp_1bit'
+output_dir = '240410_dtabFSC3D_100cube_subsamp_1bit_11k'
 #fake = True
 fake = False
 overwrite = False
@@ -25,9 +25,9 @@ overwrite = False
 home_dir = '/home/atk13/repos/tem-tomo'
 #data_path = '/Users/atk42/OneDrive - Yale University/Lab/Projects/TEM_tomo/tomo_data'
 #data_path = '/home/atk13/new_project_20471'
-data_path = '/ccdbprod/ccdbprod29/home/CCDB_DATA_USER.portal/CCDB_DATA_USER/acquisition/project_20471/'
+#data_path = '/ccdbprod/ccdbprod29/home/CCDB_DATA_USER.portal/CCDB_DATA_USER/acquisition/project_20471/'
 #tomo_lst = 'tomograms_lst - Local Tomograms for FSC.csv'
-tomo_lst = 'tomograms_lst - double_tilt_tomos.csv'
+tomo_lst = 'tomograms_lst - double_tilt_tomos_11k.csv'
 
 df = pd.read_csv(tomo_lst)
 
@@ -36,7 +36,10 @@ for index,row in df.iterrows():
 	tomo = row['Tomogram']
 	thickness = row['Thickness']
 	pixel_size = row['Pixel Size bin 4 (nm)']
+	ccdbprod  = row['ccdbprod'] 
+	pid = row['PID']
 
+	data_path = '/ccdbprod/%s/home/CCDB_DATA_USER.portal/CCDB_DATA_USER/acquisition/project_%s/' % (ccdbprod, pid)	
 	tomo_path = os.sep.join([data_path, proj, 'processed_data',tomo,'txbr-backprojection','limited-bin4'])
 	for num_ang in num_angs:
 		for max_ang in max_angs:
