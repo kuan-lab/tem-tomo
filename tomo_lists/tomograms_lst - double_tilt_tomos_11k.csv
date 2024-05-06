@@ -1,0 +1,4 @@
+Tomogram,Label,PID,EXPID,MPID,ccdbprod,Thickness,Series,Tilts/Series,Magnification,Scope/Detector,,PIxel Size (A),Pixel Size bin 4 (nm)
+MouseCerebellum_A2S1_SA11k_de64_tomo26,A2S1#26,20471,20471,5403735,ccdbprod29,500nm,,481,11k,Halo/DE64,fpb-bin4,3.5625,1.425
+MouseCerebellum_LX112_Aug23_A2S1_SA11k_DE64_tomo4,A2S1#4,20471,20471,5404716,ccdbprod30,750nm,,481,11k,Halo/DE64,fpb-bin4,3.5625,1.425
+MouseCerebellum_A1S1_SA11k_de64_tomo20,A1S1#20,20471,20471,5406052,ccdbprod32,250nm,,481,11k,Halo/DE64,fpb-bin4,3.5625,1.425
