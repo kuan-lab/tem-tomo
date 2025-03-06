@@ -83,7 +83,7 @@ def makedir(dn):
         os.makedirs(dn)
 
 def resolution_measure(vol1, vol2, num_cores, cube_size, \
-    project_name='FSC', sub_region=-1, sub_sampling_zxy = [1,1,1], use_json=False, \
+    project_name='FSC', z_clip = None, sub_region=-1, sub_sampling_zxy = [1,1,1], use_json=False, \
     snrt = 0.2071, pixel_size = 1, param_sweep=False, \
     ofn = None):
     makedir(project_name)
@@ -91,6 +91,10 @@ def resolution_measure(vol1, vol2, num_cores, cube_size, \
     z_st,x_st,y_st = (0,0,0)
     with mrcfile.open(vol1) as mrc:
         z_size,x_size,y_size = mrc.data.shape
+    if z_clip is not None:
+        z_st = z_clip[0]
+        z_size = z_clip[1] - z_clip[0] + 1 
+    # Note: sub_region z overrides z_clip
     if len(sub_region) == 3:
         if sub_region[0] > 0:
             z_st = (z_size - sub_region[0])//2

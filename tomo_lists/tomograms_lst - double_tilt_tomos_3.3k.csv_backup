@@ -1,0 +1,10 @@
+Tomogram,Label,PID,EXPID,MPID,ccdbprod,Thickness,z_min,z_max,Magnification,PIxel Size (A),Pixel Size bin 4 (nm),pixel thickness,
+MouseCerebellum_A1S1_SA3.3k_de64_tomo18,A1S1#18,20471,20471,5406026,ccdbprod32,250nm,14,80,3.3k,12.27,4.908,67,53.6
+MouseCerebellum_A1S1_SA3.3k_de64_tomo19,A1S1#19,20471,20471,5406039,ccdbprod32,250nm,12,77,3.3k,12.27,4.908,66,52.8
+MouseCerebellum_A2S1_SA3.3k_de64_tomo14,A2S1#14,20471,20471,5403735,ccdbprod29,500nm,12,120,3.3k,12.27,4.908,109,87.2
+MouseCerebellum_A2S1_SA3.3k_de64_tomo13,A2S1#13,20471,20471,5403735,ccdbprod29,500nm,10,106,3.3k,12.27,4.908,97,77.6
+MouseCerebellum_A2S1_SA3.3k_de64_tomo21,A2S1#21,20471,20471,5403735,ccdbprod29,500nm,11,106,3.3k,12.27,4.908,96,76.8
+MouseCerebellum_A3S1_SA3.3k_de64_tomo10,A3S1#10,20471,20471,5404040,ccdbprod29,750nm,14,167,3.3k,12.27,4.908,154,123.2
+MouseCerebellum_A3S1_SA3.3k_de64_tomo11,A3S1#11,20471,20471,5404040,ccdbprod29,750nm,13,169,3.3k,12.27,4.908,157,125.6
+MouseCerebellum_A4S1_SA3.3k_de64_tomo10,A4S1#10,20471,20471,5406065,ccdbprod32,1000nm,14,207,3.3k,12.27,4.908,194,155.2
+MouseCerebellum_A4S1_SA3.3k_de64_tomo11,A4S1#11,20471,20471,5406078,ccdbprod32,1000nm,11,208,3.3k,12.27,4.908,198,158.4
