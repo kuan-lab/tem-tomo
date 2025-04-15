@@ -79,7 +79,8 @@ def makedir(dn):
         os.makedirs(dn)
 
 def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
-    project_name='FSC', sub_region=-1, use_json=False, slice_step = 1, \
+    project_name='FSC', sub_region=-1, sub_sampling_zxy = [1,1,1], \
+    use_json=False, slice_step = 1, \
     snrt = 0.2071, pixel_size = 1, z_clip = None,\
     ofn = None, plane = 'beam'):
     makedir(project_name)
@@ -140,12 +141,12 @@ def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
     print("Base arguments: %s"%tmp) 
     if cutout_size > 0:
         if plane == 'beam':
-            for k in range(z_st,z_st + z_size,slice_step):
-                for i in range( x_st, x_st + x_size - cutout_size, cutout_size):
-                    for j in range( y_st, y_st + y_size - cutout_size, cutout_size):
+            for k in range(z_st,z_st + z_size, sub_sampling_zxy[1]):
+                for i in range( x_st, x_st + x_size - cutout_size, cutout_size*sub_sampling_zxy[2]):
+                    for j in range( y_st, y_st + y_size - cutout_size, cutout_size*sub_sampling_zxy[2]):
                         tmp['top_left'] = (k,i,j) 
                         par_args.append(tmp.copy())
-        elif plane == 'tilt': 
+        elif plane == 'tilt': # Warning - tilt and edge have no been updated to work with subsampling
             for i in range( x_st, x_st + x_size, slice_step):
                 for j in range( y_st, y_st + y_size - cutout_size, cutout_size):
                     for k in range(z_st,z_st + z_size - cutout_size, cutout_size):

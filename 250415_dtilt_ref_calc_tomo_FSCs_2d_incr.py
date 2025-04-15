@@ -9,6 +9,7 @@ from glob import glob
 ####### Edit these params
 num_cores = 4
 sub_region = [-1, 1890, 1890]
+sub_sampling_zxy = [16, 4, 4] # z is slice step
 cutout_size = 256 # used by resolution measure 2d 
 cube_size = 45 # only used by z_clip (to match legacy 3d fsc FOVs)
 
@@ -16,7 +17,7 @@ num_angs = [41,35,31,25,21,15,11]
 max_angs = [60,51,45,36,30,21,15]
 plane = 'beam'
 output_dir = 'results/250415_incr_2D_16x'
-slice_step = 16
+#slice_step = 16
 #fake = True
 fake = False
 #overwrite = False
