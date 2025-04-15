@@ -80,14 +80,17 @@ def makedir(dn):
 
 def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
     project_name='FSC', sub_region=-1, use_json=False, slice_step = 1, \
-    snrt = 0.2071, pixel_size = 1, \
+    snrt = 0.2071, pixel_size = 1, z_clip = None\
     ofn = None, plane = 'beam'):
     makedir(project_name)
     
     z_st,x_st,y_st = (0,0,0)
     with mrcfile.open(vol1) as mrc:
         z_size,x_size,y_size = mrc.data.shape
-
+    if z_clip is not None:
+        z_st = z_clip[0]
+        z_size = z_clip[1] - z_clip[0] + 1 
+        
     if sub_region > 0:
         z_st = (z_size - sub_region)//2
         x_st = (x_size - sub_region)//2
