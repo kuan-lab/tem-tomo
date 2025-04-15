@@ -80,7 +80,7 @@ def makedir(dn):
 
 def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
     project_name='FSC', sub_region=-1, use_json=False, slice_step = 1, \
-    snrt = 0.2071, pixel_size = 1, z_clip = None\
+    snrt = 0.2071, pixel_size = 1, z_clip = None,\
     ofn = None, plane = 'beam'):
     makedir(project_name)
     
@@ -90,14 +90,27 @@ def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
     if z_clip is not None:
         z_st = z_clip[0]
         z_size = z_clip[1] - z_clip[0] + 1 
-        
-    if sub_region > 0:
-        z_st = (z_size - sub_region)//2
-        x_st = (x_size - sub_region)//2
-        y_st = (y_size - sub_region)//2
-        z_size = sub_region
-        x_size = sub_region
-        y_size = sub_region
+
+    # Note: sub_region z overrides z_clip
+    if len(sub_region) == 3:
+        if sub_region[0] > 0:
+            z_st = (z_size - sub_region[0])//2
+            z_size = sub_region[0]
+        if sub_region[1] > 0:        
+            x_st = (x_size - sub_region[1])//2
+            x_size = sub_region[1] 
+        if sub_region[2] > 0:       
+            y_st = (y_size - sub_region[2])//2
+            y_size = sub_region[2]
+	
+    elif len(sub_region == 1):
+        if sub_region > 0:
+             z_st = (z_size - sub_region)//2
+             x_st = (x_size - sub_region)//2
+             y_st = (y_size - sub_region)//2
+             z_size = sub_region
+             x_size = sub_region
+             y_size = sub_region        
     mrc.close()
     tmp = dict()
     
