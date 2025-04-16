@@ -143,7 +143,7 @@ def resolution_measure_2D(vol1, vol2, num_cores, cutout_size=-1, \
         if plane == 'beam':
             for k in range(z_st,z_st + z_size, sub_sampling_zxy[1]):
                 for i in range( x_st, x_st + x_size - cutout_size, cutout_size*sub_sampling_zxy[2]):
-                    for j in range( y_st, y_st + y_size - cutout_size, cutout_size*sub_sampling_zxy[2]):
+                    for j in range( y_st, y_st + y_size - cutout_size, cutout_size*sub_sampling_zxy[0]):
                         tmp['top_left'] = (k,i,j) 
                         par_args.append(tmp.copy())
         elif plane == 'tilt': # Warning - tilt and edge have no been updated to work with subsampling

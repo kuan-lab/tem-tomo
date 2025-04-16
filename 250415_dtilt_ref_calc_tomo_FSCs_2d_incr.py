@@ -7,16 +7,16 @@ from resolution_measure_2D_mrc import *
 from glob import glob
 
 ####### Edit these params
-num_cores = 4
+num_cores = 8
 sub_region = [-1, 1890, 1890]
-sub_sampling_zxy = [16, 4, 4] # z is slice step
-cutout_size = 256 # used by resolution measure 2d 
+sub_sampling_zxy = [32, 16, 16] # z is slice step
+cutout_size = 45 # used by resolution measure 2d 
 cube_size = 45 # only used by z_clip (to match legacy 3d fsc FOVs)
 
 num_angs = [41,35,31,25,21,15,11]
 max_angs = [60,51,45,36,30,21,15]
 plane = 'beam'
-output_dir = 'results/250415_incr_2D_16x'
+output_dir = 'results/250415_incr_2D_45sub'
 #slice_step = 16
 #fake = True
 fake = False
@@ -99,5 +99,5 @@ for index,row in df.iterrows():
 			if not fake:
 				if overwrite or not os.path.isfile(ofn):		
 					resolution_measure_2D(a_path, b_path, num_cores, cutout_size = cutout_size, snrt = 0.5, \
-					pixel_size = pixel_size, z_clip = z_clip, sub_region = sub_region, plane = plane, \
-					slice_step = slice_step, ofn=ofn)
+					pixel_size = pixel_size, z_clip = z_clip, sub_region = sub_region, \
+					sub_sampling_zxy = sub_sampling_zxy, plane = plane, ofn=ofn)
