@@ -73,31 +73,38 @@ for index,row in df.iterrows():
 		for _ in range(1):
 			if num_ang == 121 and max_ang == 10:
 				continue
-			recon_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]' % (num_ang,max_ang,max_ang)])
-			os.chdir(recon_dir)
-			a_paths = glob(tomo+'b_z_-*0.out')
-			if len(a_paths) != 1:
-				print('Problem dir for a recon: %s' % recon_dir)
-				print(a_path)
-				fake = True
-			else:
-				a_path = os.sep.join([recon_dir, a_paths[0]])
-			ref_path = os.sep.join([data_path, proj, 'processed_data',tomo,'txbr-backprojection','bin4-0'])
-			os.chdir(ref_path)
-			b_paths = glob(tomo+'a_z_-*0.out')
-			if len(b_paths) != 1:
-				print('Problem dir for b recon : %s' % recon_dir)
-				print(b_path)
-				fake = True
-			else:
-				b_path = os.sep.join([ref_path, b_paths[0]])
-			ofn = os.sep.join([output_dir, 'FSC2D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
-			os.chdir(home_dir)
-			if not os.path.exists(output_dir):
-				os.makedirs(output_dir)
-			print('Calculating FSC for %s' % ofn)
-			if not fake:
-				if overwrite or not os.path.isfile(ofn):		
-					resolution_measure_2D(a_path, b_path, num_cores, cutout_size = cutout_size, snrt = 0.5, \
-					pixel_size = pixel_size, z_clip = z_clip, sub_region = sub_region, \
-					sub_sampling_zxy = sub_sampling_zxy, plane = plane, ofn=ofn)
+			for ref in ['a','b']:
+				recon_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]' % (num_ang,max_ang,max_ang)])
+				os.chdir(recon_dir)
+				if ref == 'a':
+					a_paths = glob(tomo+'b_z_-*0.out')
+				elif ref == 'b':
+					a_paths = glob(tomo+'a_z_-*0.out')
+				if len(a_paths) != 1:
+					print('Problem dir for a recon: %s' % recon_dir)
+					print(a_path)
+					fake = True
+				else:
+					a_path = os.sep.join([recon_dir, a_paths[0]])
+				ref_path = os.sep.join([data_path, proj, 'processed_data',tomo,'txbr-backprojection','bin4-0'])
+				os.chdir(ref_path)
+				if ref == 'a':
+					b_paths = glob(tomo+'a_z_-*0.out')
+				elif ref == 'b':
+					b_paths = glob(tomo+'b_z_-*0.out')
+				if len(b_paths) != 1:
+					print('Problem dir for b recon : %s' % recon_dir)
+					print(b_path)
+					fake = True
+				else:
+					b_path = os.sep.join([ref_path, b_paths[0]])
+				ofn = os.sep.join([output_dir, 'FSC3D_ref%s_%s_%s_%i-limited[%.1f_-%.1f].csv' % (ref, thickness, tomo,num_ang,max_ang,max_ang)])
+				os.chdir(home_dir)
+				if not os.path.exists(output_dir):
+					os.makedirs(output_dir)
+				print('Calculating FSC for %s' % ofn)
+				if not fake:
+					if overwrite or not os.path.isfile(ofn):		
+						resolution_measure_2D(a_path, b_path, num_cores, cutout_size = cutout_size, snrt = 0.5, \
+						pixel_size = pixel_size, z_clip = z_clip, sub_region = sub_region, \
+						sub_sampling_zxy = sub_sampling_zxy, plane = plane, ofn=ofn)
