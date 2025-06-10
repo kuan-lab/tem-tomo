@@ -9,12 +9,12 @@ from glob import glob
 ####### Edit these params
 num_cores = 8
 sub_region = [-1, 1890, 1890]
-sub_sampling_zxy = [32, 16, 16] # z is slice step
+sub_sampling_zxy = [32, 4, 4] # z is slice step
 cutout_size = 45 # used by resolution measure 2d 
 cube_size = 45 # only used by z_clip (to match legacy 3d fsc FOVs)
 
 # For const increment, e.g. rev1 Fig. 1g
-const_incr = True
+const_incr = False
 num_angs = [41,35,31,25,21,15,11]
 max_angs = [60,51,45,36,30,21,15]
 
@@ -23,7 +23,7 @@ num_angs = [121, 33, 21, 17, 11, 5]
 max_angs = [60,50,40,30,20,10]
  
 plane = 'beam'
-output_dir = 'results/250519_2D_45sub'
+output_dir = 'results/250602_2D_45sub'
 #slice_step = 16
 #fake = True
 fake = False

@@ -9,13 +9,14 @@ from glob import glob
 ####### Edit these params
 num_cores = 16
 cube_size = 45
-sub_sampling_zxy = [1, 4, 4]
+sub_sampling_zxy = [1, 8, 8]
 sub_region = [-1, 1890, 1890]
 num_angs = [121, 33, 21, 17, 11, 5]
 max_angs = [60,50,40,30,20,10]
 #num_angs = [121,21]
 #max_angs = [30,10]
-output_dir = 'results/240523_3.3k_4x'
+#output_dir = 'results/240523_3.3k_4x'
+output_dir = 'results/250602_3.3k_8x'
 #fake = True
 fake = False
 overwrite = False
