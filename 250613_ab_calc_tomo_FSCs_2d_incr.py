@@ -27,8 +27,8 @@ output_dir = 'results/250613_2D_abHalfBit315_45pix_4x'
 #slice_step = 16
 #fake = True
 fake = False
-overwrite = False
-#overwrite = True
+#overwrite = False
+overwrite = True
 ###########
 
 # Working with file structure to analyze multiple datasets
@@ -85,7 +85,7 @@ for index,row in df.iterrows():
             recon_dir = os.sep.join([tomo_path,'%i-limited[%.1f_-%.1f]' % (num_ang,max_ang,max_ang)])
             os.chdir(recon_dir)
             
-            a_paths = glob(tomo+'b_z_-*0.out')
+            a_paths = glob(tomo+'a_z_-*0.out')
             if len(a_paths) != 1:
                 print('Problem dir for a recon: %s' % recon_dir)
                 print(a_path)
@@ -101,7 +101,7 @@ for index,row in df.iterrows():
             else:
                 b_path = os.sep.join([recon_dir, b_paths[0]])
 				
-            ofn = os.sep.join([output_dir, 'FSC3D_ref%s_%s_%s_%i-limited[%.1f_-%.1f].csv' % (ref, thickness, tomo,num_ang,max_ang,max_ang)])
+            ofn = os.sep.join([output_dir, 'FSC2D_%s_%s_%i-limited[%.1f_-%.1f].csv' % (thickness, tomo,num_ang,max_ang,max_ang)])
             os.chdir(home_dir)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
