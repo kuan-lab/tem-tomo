@@ -193,6 +193,7 @@ def fit_gaussian_and_compute_fwhm(profile, plot_fit=False, title=""):
         popt: fitted Gaussian parameters (A, x0, sigma, offset)
     """
     x = np.arange(len(profile))
+    x2 = np.arange(np.min(x), np.max(x), .1)
 
     # Initial guesses
     A_guess = np.max(profile) - np.min(profile)
@@ -208,7 +209,7 @@ def fit_gaussian_and_compute_fwhm(profile, plot_fit=False, title=""):
 
         if plot_fit:
             plt.plot(x, profile, 'b.', label='Data')
-            plt.plot(x, gaussian(x, *popt), 'r-', label=f'Gaussian Fit\nFWHM={fwhm:.2f} px')
+            plt.plot(x2, gaussian(x2, *popt), 'r-', label=f'Gaussian Fit\nFWHM={fwhm:.2f} px')
             plt.title(title)
             plt.xlabel('Position (px)')
             plt.ylabel('Intensity')
@@ -462,6 +463,11 @@ def plot_fwhm_summary_by_dataset(all_fwhms_x, all_fwhms_y, all_fwhms_z, dataset_
     ax.bar(x,         means_y, width, yerr=stds_y, label='Y', capsize=6)
     ax.bar(x + width, means_z, width, yerr=stds_z, label='Z', capsize=6)
 
+    for i,xi in enumerate(x):
+        ax.scatter(np.repeat(xi - width,len(all_fwhms_x[i])), all_fwhms_x[i])
+        ax.scatter(np.repeat(xi,len(all_fwhms_y[i])), all_fwhms_y[i])
+        ax.scatter(np.repeat(xi + width,len(all_fwhms_z[i])), all_fwhms_z[i])
+              
     ax.set_xticks(x)
     ax.set_xticklabels(dataset_names, rotation=45, ha='right')
     ax.set_ylabel('FWHM (px)')
