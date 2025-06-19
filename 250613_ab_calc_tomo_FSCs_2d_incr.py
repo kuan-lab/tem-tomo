@@ -14,6 +14,7 @@ cutout_size = 45 # used by resolution measure 2d
 cube_size = 45 # only used by z_clip (to match legacy 3d fsc FOVs)
 
 # For const increment, e.g. rev1 Fig. 1g
+#const_incr = True
 const_incr = False
 num_angs = [41,35,31,25,21,15,11]
 max_angs = [60,51,45,36,30,21,15]
@@ -23,7 +24,7 @@ num_angs = [121, 33, 21, 17, 11, 5]
 max_angs = [60,50,40,30,20,10]
  
 plane = 'beam'
-output_dir = 'results/250613_2D_abHalfBit315_45pix_4x'
+output_dir = 'results/250617_11k_2D_incr_abHalfBit315_45pix_4x'
 #slice_step = 16
 #fake = True
 fake = False
@@ -33,7 +34,8 @@ overwrite = True
 
 # Working with file structure to analyze multiple datasets
 home_dir = '/home/atk13/repos/tem-tomo'
-tomo_lst = 'tomo_lists/tomograms_lst - double_tilt_tomos_3.3k.csv'
+#tomo_lst = 'tomo_lists/tomograms_lst - double_tilt_tomos_3.3k.csv'
+tomo_lst = 'tomo_lists/tomograms_lst - double_tilt_tomos_11k.csv'
 df = pd.read_csv(tomo_lst)
 
 for index,row in df.iterrows():
