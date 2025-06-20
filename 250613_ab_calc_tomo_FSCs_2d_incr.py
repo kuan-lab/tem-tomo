@@ -28,8 +28,8 @@ output_dir = 'results/250617_11k_2D_incr_abHalfBit315_45pix_4x'
 #slice_step = 16
 #fake = True
 fake = False
-#overwrite = False
-overwrite = True
+overwrite = False
+#overwrite = True
 ###########
 
 # Working with file structure to analyze multiple datasets
