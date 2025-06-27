@@ -11,7 +11,8 @@ from pathlib import Path
 from scipy.optimize import curve_fit
 
 import matplotlib.pyplot as plt
-from typing import List, Tuple
+from collections.abc import Iterable
+from typing import List, Sequence, Tuple, Union
 
 # -----------------------------------
 # Step 1: Extract annotation points
@@ -258,7 +259,115 @@ def _moving_average_edge_safe(arr: np.ndarray, window: int) -> np.ndarray:
     return np.convolve(padded, kernel, mode="valid")
 
 
-def fit_gaussian_and_compute_fwhm(profile, linewidth: int = 1, plot_fit: bool = False, title: str = ""):
+def fit_gaussian_and_compute_fwhm(
+    profile: np.ndarray,
+    *,
+    linewidth: int = 1,
+    bead_diam_nm: float = 0.0,
+    pixel_size_nm: float | None = None,
+    plot_fit: bool = False,
+    title: str = "",
+) -> Tuple[float, List[float], float]:
+    """Fit a 1‑D profile with a Gaussian and compute (optionally deconvolved) FWHM.
+
+    Parameters
+    ----------
+    profile
+        1‑D or (linewidth × length) 2‑D intensity array.
+    linewidth
+        Number of adjacent rows/columns to average for a thicker line profile.
+    bead_diam_nm
+        *D* — Physical diameter of the bead used for deconvolution **(nm)**.
+        If ≤0, the raw measured FWHM is returned.
+    pixel_size_nm
+        Pixel size in nm / px. Required if *bead_diam_nm* > 0.
+    plot_fit
+        Plot data + Gaussian fit.
+    title
+        Figure title when *plot_fit* is True.
+
+    Returns
+    -------
+    fwhm_effective_px : float
+        FWHM after deconvolution if *bead_diam_nm* > 0, else the measured FWHM.
+        Returned **in pixels** to keep downstream code unchanged.
+    popt : list[float]
+        Gaussian parameters ``[A, x0, sigma, offset]``.
+    r_squared : float
+        Coefficient of determination for the fit.
+    """
+    # ­­­Ensure NumPy array of floats for safe calculations
+    profile = np.asarray(profile, dtype=float)
+
+    # Collapse to 1‑D according to requested linewidth
+    if profile.ndim == 2:
+        if linewidth > profile.shape[0]:
+            raise ValueError("linewidth exceeds available profile thickness")
+        profile_1d = profile[:linewidth, :].mean(axis=0)
+    else:
+        profile_1d = (
+            _moving_average_edge_safe(profile, int(linewidth))
+            if linewidth > 1
+            else profile
+        )
+
+    x = np.arange(profile_1d.size)
+    x_dense = np.linspace(float(x.min()), float(x.max()), num=int((x.max() - x.min()) * 10) + 1)
+
+    # Initial parameter guesses (per user‑supplied scheme)
+    A_guess = float(np.max(profile_1d) - np.min(profile_1d))
+    x0_guess = float(np.argmin(profile_1d))
+    sigma_guess = 3.0  # pixels
+    offset_guess = float(np.max(profile_1d))
+    p0 = [A_guess, x0_guess, sigma_guess, offset_guess]
+
+    try:
+        popt, _ = curve_fit(gaussian, x, profile_1d, p0=p0)
+        _, x0, sigma, _ = popt
+        fwhm_meas_px = 2.355 * abs(sigma)
+
+        # Default effective FWHM is the measured one
+        fwhm_eff_px: float = fwhm_meas_px
+
+        # Optional deconvolution
+        if bead_diam_nm > 0:
+            if pixel_size_nm is None or pixel_size_nm <= 0:
+                raise ValueError("pixel_size_nm must be >0 when deconvolving with bead size")
+            fwhm_psf_nm = estimate_psf_fwhm_from_top_hat(
+                fwhm_meas_px, bead_diam_nm, pixel_size_nm
+            )
+            fwhm_eff_px = float(fwhm_psf_nm / pixel_size_nm)
+
+        # Goodness of fit (R²)
+        fitted = gaussian(x, *popt)
+        ss_res = float(np.sum((profile_1d - fitted) ** 2))
+        ss_tot = float(np.sum((profile_1d - profile_1d.mean()) ** 2))
+        r_squared = 1 - ss_res / ss_tot if ss_tot else np.nan
+
+        if plot_fit:
+            plt.plot(x, profile_1d, "b.", label="Data")
+            plt.plot(
+                x_dense,
+                gaussian(x_dense, *popt),
+                "r-",
+                label=(
+                    f"Gaussian Fit\nFWHM = {fwhm_eff_px:.2f} px\nR² = {r_squared:.3f}"
+                ),
+            )
+            plt.title(title)
+            plt.xlabel("Position (px)")
+            plt.ylabel("Intensity")
+            plt.legend() 
+            plt.grid(True)
+            plt.show()
+
+        return fwhm_eff_px, popt, r_squared
+
+    except Exception as e:
+        print(f"⚠️ Gaussian fit failed: {e}")
+        return np.nan, [np.nan] * 4, np.nan
+    
+def fit_gaussian_and_compute_fwhm_old2(profile, linewidth: int = 1, plot_fit: bool = False, title: str = ""):
     """
     Fit a 1‑D profile with a Gaussian and compute FWHM.
 
@@ -382,8 +491,156 @@ def fit_gaussian_and_compute_fwhm_old(profile, plot_fit=False, title=""):
         return None, None
 
 
+def compute_fwhms_from_subvolumes(
+    subvolumes: Iterable[np.ndarray],
+    *,
+    linewidth: int = 1,
+    bead_diam_nm: float = 0.0,
+    pixel_size_nm: float | None = None,
+    r2_cutoff: float = 0.0,
+) -> Tuple[List[float], List[float], List[float], List[float], List[float], List[float]]:
+    """Compute FWHM along X/Y/Z for each bead, **optionally rejecting poor fits**.
 
-def compute_fwhms_from_subvolumes(subvolumes, linewidth = 1):
+    A bead (sub‑volume) is *kept* only if its X‑ and Z‑axis Gaussian fits both
+    have R² ≥ `r2_cutoff`.  Y‑axis R² is ignored when deciding inclusion, but the
+    corresponding Y FWHM is returned for beads that pass the X+Z criterion.
+
+    Parameters
+    ----------
+    subvolumes : Iterable[np.ndarray]
+        Each volume has shape (Z, Y, X).
+    linewidth : int, optional
+        Profile‑averaging thickness.
+    bead_diam_nm : float, optional
+        Bead diameter used for deconvolution; ≤0 disables deconvolution.
+    pixel_size_nm : float, optional
+        Pixel size (nm/px); required if deconvolving.
+    r2_cutoff : float, optional
+        Minimum R² required **simultaneously** for X and Z fits. Defaults to 0
+        (no filtering).
+
+    Returns
+    -------
+    fwhms_x, fwhms_y, fwhms_z, r2s_x, r2s_y, r2s_z : list[float]
+        Lists contain only the beads that passed the R² criterion.
+    """
+    fwhms_x: List[float] = []
+    fwhms_y: List[float] = []
+    fwhms_z: List[float] = []
+    r2s_x: List[float] = []
+    r2s_y: List[float] = []
+    r2s_z: List[float] = []
+
+    for vol in subvolumes:
+        z, y, x = vol.shape
+        profile_z = vol[:, y // 2, x // 2]
+        profile_y = vol[z // 2, :, x // 2]
+        profile_x = vol[z // 2, y // 2, :]
+
+        fwhm_z, _, r2_z = fit_gaussian_and_compute_fwhm(
+            profile_z,
+            linewidth=linewidth,
+            bead_diam_nm=bead_diam_nm,
+            pixel_size_nm=pixel_size_nm,
+        )
+        fwhm_x, _, r2_x = fit_gaussian_and_compute_fwhm(
+            profile_x,
+            linewidth=linewidth,
+            bead_diam_nm=bead_diam_nm,
+            pixel_size_nm=pixel_size_nm,
+        )
+        # Y‑axis (computed even though it doesn't influence inclusion)
+        fwhm_y, _, r2_y = fit_gaussian_and_compute_fwhm(
+            profile_y,
+            linewidth=linewidth,
+            bead_diam_nm=bead_diam_nm,
+            pixel_size_nm=pixel_size_nm,
+        )
+
+        keep = (
+            (np.isfinite(r2_x) and np.isfinite(r2_z))
+            and (r2_x >= r2_cutoff and r2_z >= r2_cutoff)
+        )
+        if keep:
+            fwhms_x.append(fwhm_x)
+            fwhms_y.append(fwhm_y)
+            fwhms_z.append(fwhm_z)
+            r2s_x.append(r2_x)
+            r2s_y.append(r2_y)
+            r2s_z.append(r2_z)
+
+    return fwhms_x, fwhms_y, fwhms_z, r2s_x, r2s_y, r2s_z
+
+def compute_fwhms_from_subvolumes_old(
+    subvolumes: Iterable[np.ndarray],
+    *,
+    linewidth: int = 1,
+    bead_diam_nm: float = 0.0,
+    pixel_size_nm: float | None = None,
+) -> Tuple[List[float], List[float], List[float], List[float], List[float], List[float]]:
+    """Measure (and optionally deconvolve) FWHM along X/Y/Z for each sub‑volume.
+
+    Parameters
+    ----------
+    subvolumes
+        Sequence of volumes with shape ``(Z, Y, X)``.
+    linewidth
+        Thickness for the line‑profile average.
+    bead_diam_nm
+        Bead diameter *D* (nm). If ≤0, no deconvolution.
+    pixel_size_nm
+        Pixel size (nm/px). Required if *bead_diam_nm* > 0.
+
+    Returns
+    -------
+    (fwhms_x, fwhms_y, fwhms_z, r2s_x, r2s_y, r2s_z)
+        Six lists matching *subvolumes* order.
+    """
+    fwhms_x: List[float] = []
+    fwhms_y: List[float] = []
+    fwhms_z: List[float] = []
+    r2s_x: List[float] = []
+    r2s_y: List[float] = []
+    r2s_z: List[float] = []
+
+    for vol in subvolumes:
+        z, y, x = vol.shape
+
+        profile_z = vol[:, y // 2, x // 2]
+        profile_y = vol[z // 2, :, x // 2]
+        profile_x = vol[z // 2, y // 2, :]
+
+        fwhm_z, _, r2_z = fit_gaussian_and_compute_fwhm(
+            profile_z,
+            linewidth=linewidth,
+            bead_diam_nm=bead_diam_nm,
+            pixel_size_nm=pixel_size_nm,
+        )
+        fwhm_y, _, r2_y = fit_gaussian_and_compute_fwhm(
+            profile_y,
+            linewidth=linewidth,
+            bead_diam_nm=bead_diam_nm,
+            pixel_size_nm=pixel_size_nm,
+        )
+        fwhm_x, _, r2_x = fit_gaussian_and_compute_fwhm(
+            profile_x,
+            linewidth=linewidth,
+            bead_diam_nm=bead_diam_nm,
+            pixel_size_nm=pixel_size_nm,
+        )
+
+        fwhms_z.append(fwhm_z)
+        fwhms_y.append(fwhm_y)
+        fwhms_x.append(fwhm_x)
+
+        r2s_z.append(r2_z)
+        r2s_y.append(r2_y)
+        r2s_x.append(r2_x)
+
+    return fwhms_x, fwhms_y, fwhms_z, r2s_x, r2s_y, r2s_z
+
+
+def compute_fwhms_from_subvolumes_old (subvolumes, linewidth = 1):
     fwhms_x, fwhms_y, fwhms_z = [], [], []
     r2s_x, r2s_y, r2s_z = [], [], []
     for vol in subvolumes:
@@ -401,9 +658,9 @@ def compute_fwhms_from_subvolumes(subvolumes, linewidth = 1):
         fwhms_y.append(fwhm_y)
         fwhms_x.append(fwhm_x)
 
-        r2s_z.append(popt_z)
-        r2s_y.append(popt_y)
-        r2s_x.append(popt_x)
+        r2s_z.append(r2s_z)
+        r2s_y.append(r2s_y)
+        r2s_x.append(r2s_x)
 
     return fwhms_x, fwhms_y, fwhms_z, r2s_x, r2s_y, r2s_z
 
@@ -636,5 +893,173 @@ def plot_fwhm_summary_by_dataset(all_fwhms_x, all_fwhms_y, all_fwhms_z, dataset_
     ax.set_title('FWHM Mean ± Std per Dataset and Axis')
     ax.legend()
     ax.grid(True, axis='y')
+    plt.tight_layout()
+    #plt.show()
+
+def estimate_psf_fwhm_from_top_hat(fwhm_meas_px: float,
+                                   bead_diam_nm: float,
+                                   pixel_size_nm: float) -> float:
+    """
+    Estimate PSF FWHM (nm) when the object is a top-hat bead.
+
+    Parameters
+    ----------
+    fwhm_meas_px : float
+        FWHM of the fitted Gaussian (in pixels).
+    bead_diam_nm : float
+        Physical bead diameter (nm), e.g. 5.0.
+    pixel_size_nm : float
+        Detector sampling in nm/px.
+
+    Returns
+    -------
+    float
+        Estimated PSF FWHM in nm.
+    """
+    fwhm_meas_px = np.asarray(fwhm_meas_px, dtype=float)
+
+    fwhm_meas_nm = fwhm_meas_px * pixel_size_nm
+    # Convert to sigma
+    sigma_meas = fwhm_meas_nm / 2.355
+
+    # Variance of a 1-D top-hat of width D
+    var_bead = (bead_diam_nm ** 2) / 12.0
+    if sigma_meas**2 <= var_bead:
+        raise ValueError("Measured profile is narrower than the bead itself.")
+    sigma_psf = np.sqrt(sigma_meas**2 - var_bead)
+    return 2.355 * sigma_psf   # back to FWHM
+
+# -----------------------------------------------------------------------------
+# Skip‑list helpers (based on R² quality)
+# -----------------------------------------------------------------------------
+
+def generate_skip_bead_indices(
+    r2x_list: Sequence[Sequence[float]],
+    r2z_list: Sequence[Sequence[float]],
+    *,
+    r2_cutoff: float = 0.9,
+) -> List[int]:
+    """Return a **single 1‑D list of bead indices to skip across *all* datasets.*
+
+    We assume every dataset shares the same bead ordering (i.e. bead index 5
+    refers to the same physical bead in every dataset).  A bead index appears
+    in the skip list if **any** dataset has an X‑ or Z‑axis Gaussian fit with
+    R² < `r2_cutoff` (or non‑finite) for that bead.  Duplicate indices are
+    removed automatically.
+    """
+    if not r2x_list:
+        return []
+
+    # Longest dataset defines the maximum bead index
+    n_beads = max(len(ds) for ds in r2x_list)
+    skip: set[int] = set()
+
+    for bead_idx in range(n_beads):
+        for rx_ds, rz_ds in zip(r2x_list, r2z_list):
+            if bead_idx >= len(rx_ds):
+                continue  # this dataset has fewer beads; ignore
+            rx = rx_ds[bead_idx]
+            rz = rz_ds[bead_idx]
+            if (not np.isfinite(rx)) or (not np.isfinite(rz)) or rx < r2_cutoff or rz < r2_cutoff:
+                skip.add(bead_idx)
+                break  # no need to check other datasets for this bead
+
+    return sorted(skip)
+
+# -----------------------------------------------------------------------------
+# Plotting helpers
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Profile extraction (user‑annotated geometric centre)
+# -----------------------------------------------------------------------------
+
+def _extract_center_profiles(vol: np.ndarray, *, linewidth: int = 1) -> dict[str, np.ndarray]:
+    """Return X, Y, Z line‑profiles that pass through the **geometric centre**
+    of *vol* (assumes the sub‑volume is already centred on the bead by the
+    user's annotation).
+
+    If *linewidth* > 1, average symmetrically about the centre point; at the
+    edges the window shrinks as needed.
+    """
+    z_sz, y_sz, x_sz = vol.shape
+    zc, yc, xc = z_sz // 2, y_sz // 2, x_sz // 2
+
+    if linewidth <= 1:
+        return {
+            "Z": vol[:, yc, xc],
+            "Y": vol[zc, :, xc],
+            "X": vol[zc, yc, :],
+        }
+
+    half = linewidth // 2
+    slc = lambda c, sz: slice(max(c - half, 0), min(c + half + 1, sz))
+    return {
+        "Z": vol[:, slc(yc, y_sz), slc(xc, x_sz)].mean(axis=(1, 2)),
+        "Y": vol[slc(zc, z_sz), :, slc(xc, x_sz)].mean(axis=(0, 2)),
+        "X": vol[slc(zc, z_sz), slc(yc, y_sz), :].mean(axis=(0, 1)),
+    }
+
+
+# -----------------------------------------------------------------------------
+# Grid‑plot helper (rows = beads, cols = X/Y/Z)
+# -----------------------------------------------------------------------------
+
+def plot_dataset_fit_grid(
+    dataset_idx: int,
+    subvolumes_list: Sequence[Sequence[np.ndarray]],
+    *,
+    linewidth: int = 1,
+    bead_diam_nm: float = 0.0,
+    pixel_size_nm: float | None = None,
+    skip_indices_global: Sequence[int] | None = None,
+):
+    """Visualise Gaussian fits for every bead in *dataset_idx*.
+
+    Parameters
+    ----------
+    dataset_idx : int
+        Index of the dataset to plot (0‑based).
+    subvolumes_list : list[list[np.ndarray]]
+        Master list: ``[[vols_ds0], [vols_ds1], …]``.
+    skip_indices_global : list[int] | None, optional
+        Global bead indices to omit (e.g. from :pyfunc:`generate_skip_bead_indices`).
+    """
+    if dataset_idx < 0 or dataset_idx >= len(subvolumes_list):
+        raise IndexError("dataset_idx out of range")
+
+    vols = subvolumes_list[dataset_idx]
+    skip_set = set(skip_indices_global or [])
+    keep = [i for i in range(len(vols)) if i not in skip_set]
+    if not keep:
+        print("All beads skipped for this dataset.")
+        return
+
+    axes_labels = ("X", "Y", "Z")
+    fig, axs = plt.subplots(len(keep), 3, figsize=(9, 2.5 * len(keep)), squeeze=False)
+
+    for row, bead_idx in enumerate(keep):
+        vol = vols[bead_idx]
+        profiles = _extract_center_profiles(vol, linewidth=linewidth)
+        for col, axis in enumerate(axes_labels):
+            ax = axs[row, col]
+            profile = profiles[axis]
+            x = np.arange(len(profile))
+            fwhm, popt, r2 = fit_gaussian_and_compute_fwhm(
+                profile,
+                linewidth=1,
+                bead_diam_nm=bead_diam_nm,
+                pixel_size_nm=pixel_size_nm,
+            )
+            ax.plot(x, profile, "b.")
+            if np.isfinite(popt[0]):
+                x_dense = np.linspace(0, len(profile) - 1, 10 * len(profile))
+                ax.plot(x_dense, gaussian(x_dense, *popt), "r-")
+            ax.set_title(f"Bead {bead_idx} {axis} | F={fwhm:.1f}px R²={r2:.2f}")
+            ax.set_xlabel("px")
+            if col == 0:
+                ax.set_ylabel("intensity")
+            ax.grid(alpha=0.3)
+
     plt.tight_layout()
     plt.show()
