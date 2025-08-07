@@ -1,0 +1,44 @@
+This software ("Electra") is Copyright � 2006 by Laboratory of Structural
+Biology Research ("LSBR") at the National Institutes of Health.
+The following terms apply to all files associated with the software unless
+explicitly disclaimed in individual files.
+
+LSBR hereby grants permission to use, copy, and distribute this software and
+its documentation for research purposes only, provided that existing copyright
+notices are retained in all copies and that this notice is included verbatim in
+any distributions. Additionally, LSBR grants permission to modify this software
+and its documentation, provided that such modifications are not distributed
+without the explicit consent of LSBR and that existing copyright notices are
+retained in all copies.
+Use of this software constitutes acceptance of these terms and conditions.
+
+IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF
+THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES THEREOF, EVEN
+IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES, INCLUDING,
+BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS
+HAVE NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+OR MODIFICATIONS.
+
+All programs were written by Giovanni Cardone from the LSBR, with some
+exceptions as indicated in the source code.
+In particular, the package is built upon the BSOFT library, which is developed
+by Bernard Heymann. Consequently, some routines from BSOFT are included
+in the package.
+
+Contact email: cardoneg@mail.nih.gov
+          www: http://lsbr.niams.nih.gov
+
+
+COPYRIGHTS OF ADAPTED CODES
+---------------------------
+The following two source files are adapted from existing codes.
+They are excluded from this license, and separate licenses are appended to the files:
+
+intersect.cc
+convex_hull.cc

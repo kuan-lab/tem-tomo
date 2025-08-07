@@ -1,0 +1,8 @@
+# Sun gcc compiler
+
+set CCVERSION = `gcc -v | & grep "gcc version" | cut -f3 -d" "`
+set C = 'gcc'
+set CC = 'c++'
+set CFLAGS = '-O2 -DSUNOS'
+set LINKOPTS = ' '
+

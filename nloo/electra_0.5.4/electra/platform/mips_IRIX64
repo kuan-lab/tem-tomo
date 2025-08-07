@@ -1,0 +1,13 @@
+# SGI MIPS 32 and 64 bit native compiler
+
+set CCVERSION = `CC -version |& cut -f4 -d" "`
+set C = 'cc'
+set CC = 'CC'
+set CFLAGS = '-O -64 -LANG:libc_in_namespace_std=OFF'
+set LINKOPTS = '-64 -L/usr/lib64 -LANG:libc_in_namespace_std=OFF'
+set TIFF64 = "-DUSE_64BIT_API"
+if ( $SET32) then
+	set CFLAGS = '-O -n32 -LANG:libc_in_namespace_std=OFF'
+	set LINKOPTS = '-n32 -L/usr/lib32 -LANG:libc_in_namespace_std=OFF'
+	set TIFF64 = " "
+endif

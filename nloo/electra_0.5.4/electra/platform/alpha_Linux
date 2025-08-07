@@ -1,0 +1,7 @@
+# Alpha Redhat Linux native 64 bit compiler
+
+set TIFF64 = '-DUSE_64BIT_API -DNO_FSTAT'
+set C = 'ccc'     # Compaq C compiler
+set CC = 'cxx -x cxx'  # Compaq C++ compiler
+set CFLAGS = '-O '$TIFF64
+

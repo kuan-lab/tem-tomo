@@ -1,0 +1,204 @@
+/* 
+	math_util.c 
+	Mathematics utility functions 
+	Author: Bernard Heymann 
+	Created: 20030414	Modified: 20040531
+*/ 
+
+#include "math_util.h" 
+#include "utilities.h" 
+
+// Declaration of global variables
+extern int 	verbose;		// Level of output to the screen
+extern long memory;			// Total memory allocated 
+
+/************************************************************************
+@Function: bfloor
+@Description:
+	Truncates a value to a specified number of decimal places.
+@Algorithm:
+	.
+@Arguments:
+	double value	value to be truncated.
+	int places		number of decimal places.
+@Returns:
+	int 			0.
+************************************************************************/
+double		bfloor(double value, int places)
+{
+	int 		i;
+	double		mult = 1;
+	
+	if ( places < 0 ) places = 0;
+	
+	for ( i=0; i<places; i++ ) mult *= 10;
+	
+	return(floor(mult*value)/mult);
+}
+
+/************************************************************************
+@Function: bround
+@Description:
+	Rounds a value to a specified number of decimal places.
+@Algorithm:
+	.
+@Arguments:
+	double value	value to be rounded.
+	int places		number of decimal places.
+@Returns:
+	int 			0.
+************************************************************************/
+double		bround(double value, int places)
+{
+	int 		i;
+	double		mult = 1;
+	
+	if ( places < 0 ) places = 0;
+	
+	for ( i=0; i<places; i++ ) mult *= 10;
+	
+	return(floor(mult*value + 0.5)/mult);
+}
+
+/************************************************************************
+@Function: gamma_ln
+Source: Numerical Recipes
+@Description:
+	Calculates the natural logarithm of the gamma function.
+@Algorithm:
+	.
+@Arguments:
+	float x			.
+@Returns:
+	float			ln(gamma)
+**************************************************************************/
+float		gamma_ln(float x)
+{
+	int				j;
+	double			y, tmp;
+	
+	double			ser = 1.000000000190015;
+	static double 	cof[6]={76.18009172947146,-86.50532032941677,
+		24.01409824083091,-1.231739572450155,
+		0.1208650973866179e-2,-0.5395239384953e-5};
+
+	y = x;
+	tmp = x + 5.5;
+	tmp -= (x + 0.5)*log(tmp);
+	
+	for ( j=0; j<=5; j++ ) ser += cof[j]/++y;
+	
+	return(-tmp+log(2.5066282746310005*ser/x));
+}
+
+/************************************************************************
+@Function: factorial
+@Source: Numerical Recipes
+@Description:
+	Calculates the factorial of n.
+@Algorithm:
+	All values of n less than 1 returns 1.
+	An exact calculation is done for 1 < n <= 50.
+	The Lancos approximation is used for n > 50.
+	Factorials of integers larger than 170 exceeds the capacity of a 
+	double and causes program termination.
+@Arguments:
+	int n			integer.
+@Returns:
+	double			factorial of n.
+**************************************************************************/
+double		factorial(int n)
+{
+	double		fn;
+	
+	if ( n > 170 ) {
+		fprintf(stderr, "Error: Factorial of %d exceeds maximum value of a double!\n", n);
+		exit(-1);
+	}
+	
+	if ( n <= 1 ) return(1);
+	
+	if ( n > 50 ) return(exp(gamma_ln(n+1.0)));
+	
+	for ( fn = 1; n > 1; n-- ) fn *= n;
+	
+	return(fn);
+}
+
+/************************************************************************
+@Function: prime_factors
+@Description:
+	Finds all the prime factor for the input number.
+@Algorithm:
+	Calculates the prime factors from the smallest to the largest.
+@Arguments:
+	unsigned long number	integer.
+	int* nfactors			number of prime factors.
+@Returns:
+	unsigned long*			array of prime factors (can be NULL).
+**************************************************************************/
+unsigned long*  prime_factors(unsigned long number, int* nfactors)
+{
+	unsigned long	divisor, pn[1000];
+	int				i, n = 0;
+	
+	if ( verbose && VERB_FULL )
+		printf("Prime factors for number %ld:   ", number);
+	
+	while ( number > 1 ) {
+		divisor = smallest_prime(number);
+		if ( divisor < 1 ) break;
+		pn[n] = divisor;
+		number /= divisor;
+		n++;
+	}
+	
+	*nfactors = n;
+	
+	if ( n < 1 ) return(NULL);
+	
+	unsigned long*  prime = (unsigned long *) balloc(n*sizeof(unsigned long));
+	for ( i=0; i<n; i++ ) prime[i] = pn[i];
+	
+	if ( verbose && VERB_FULL ) {
+		for ( i=0; i<n; i++ ) printf("%ld ", pn[i]);
+		printf("\n");
+	}
+	
+	return(prime);
+}
+
+/************************************************************************
+@Function: smallest_prime
+@Description:
+	Finds the smallest prime number factor of the input number.
+@Algorithm:
+	Tries to divide the given positive integer number by 
+	primes from 2 to the square root of the integer.
+	Returns the first prime divisor found, which may be the 
+	input number if it is prime.
+@Arguments:
+	unsigned long number	integer.
+@Returns:
+	unsigned long			smallest prime factor.
+**************************************************************************/
+unsigned long	smallest_prime(unsigned long number)
+{
+	if ( number < 2 ) {
+		printf("Zero and one are neither composite nor prime numbers!\n");
+		return 1;
+	}
+	
+	if ( number%2 == 0 ) return 2;
+	if ( number%3 == 0 ) return 3;
+
+	/* Primes generated by alternatingly adding 2 or 4 */
+	unsigned long	i, inc = 2;
+	double			max = sqrt((double)number);
+	for( i=5; i<=max; i+=inc, inc=6-inc)
+		if ( number%i == 0 ) return i;
+ 
+	return(number);
+}
+
+

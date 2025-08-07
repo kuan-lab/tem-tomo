@@ -1,0 +1,38 @@
+0.5.4
+et-fsceo: fixed a buffer overflow error. 
+Changed installation script to make it compatible with more platforms.
+et-nloo_setup: fixed backward-compatibility issues.
+
+0.5.3
+et-nloo_setup: made partly compliant with new format of tilt.com files. Added GPU flag to parameters read from tilt.com.
+
+0.5.2
+installation: minor changes, added a test for the detection of the processor type.
+
+0.5.1
+et-findbeads: minor corrections.
+
+0.5.0
+et-nloo_setup: modified interface for distributing processes.
+et-nloo: resolution limit derived from the imod file, by default.
+Introduced new program, et-findbeads.
+
+0.4.10
+Universal binaries for MacOSX.
+
+0.4.9
+Fixed bug in et-tiltnloo for tomograms reconstructed not using the complete tilt series.
+Improved cross platform portability.
+
+0.4.8
+Only MRC format now supported.
+Dependance on Bsoft eliminated. Routines needed are now included in the package.
+
+0.4.7
+Added some flags to open large files in linux.
+
+0.4.6
+Added some documentation.
+
+0.4.5
+First version with tomograms read from et-nloo_setup in buffered mode.

@@ -1,0 +1,14 @@
+# MAC OSX Darwin Intel gcc compiler
+
+set CCVERSION = `gcc -v | & grep "gcc version" | cut -f3 -d" "`
+set GCCMV = `echo $CCVERSION | cut -f1 -d"."`
+echo gcc major version: $GCCMV
+set C = 'gcc'
+set CC = 'g++'
+set ARCH = '-arch ppc -arch ppc64 -arch i386 -arch x86_64' 
+if ( `uname -r | cut -f1 -d"."` >= 10 ) then
+        set ARCH = '-arch ppc -arch i386 -arch x86_64' 
+endif
+set CFLAGS = "-O3 -DDARWIN -fPIC $ARCH -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
+set LINKOPTS = "-fPIC $ARCH -bind_at_load "
+set AR = 'ar rc'

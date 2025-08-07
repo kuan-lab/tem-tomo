@@ -1,0 +1,16 @@
+# IBM Suse Linux 32 bit gcc and 64 bit gcc modified compilers
+
+if ( $SET32 ) then
+	set C = 'gcc'
+	set CC = 'c++'
+	set CFLAGS = '-fPIC -O -ggdb'
+	set LINKOPTS = '-fPIC'
+else
+	set C = '/opt/cross/bin/powerpc64-linux-gcc'
+	set CC = '/opt/cross/bin/powerpc64-linux-g++'
+	set CFLAGS = '-fPIC -O -ggdb'
+	set LINKOPTS = '-fPIC'
+	set AR = '/opt/cross/bin/powerpc64-linux-ar rcs'
+	set TIFF64 = "-DUSE_64BIT_API"
+endif
+

@@ -1,0 +1,13 @@
+# AMD 32 and 64 bit gcc compiler
+
+set CCVERSION = `gcc -v | & grep "gcc version" | cut -f3 -d" "`
+set C = 'gcc'
+set CC = 'c++'
+set CFLAGS = '-m64 -fPIC -O -ggdb'
+set LINKOPTS = '-m64 -fPIC'
+set TIFF64 = "-DUSE_64BIT_API"
+if ( $SET32 ) then
+	set CFLAGS = '-m32 -fPIC -O -ggdb'
+	set LINKOPTS = '-m32 -fPIC'
+	set TIFF64 = " "
+endif

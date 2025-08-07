@@ -1,0 +1,7 @@
+# AMD 32 and 64 bit icc compiler
+
+set C = 'icc'
+set CC = 'icc -Kc++'
+set CFLAGS = '-fPIC -O'
+set LINKOPTS = '-fPIC'
+set TIFF64 = "-DUSE_64BIT_API"

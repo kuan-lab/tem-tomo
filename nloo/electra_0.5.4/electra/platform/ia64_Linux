@@ -1,0 +1,8 @@
+# Itanium with Intel icc compiler
+
+set C = 'icc'
+set CC = 'icc -Kc++'
+set CFLAGS = '-fPIC -O -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
+set LINKOPTS = '-fPIC'
+set TIFF64 = "-DUSE_64BIT_API"
+

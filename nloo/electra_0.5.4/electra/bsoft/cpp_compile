@@ -1,0 +1,30 @@
+# C++ compiler scriptlet
+#
+# Required flags
+#	$CC
+#	$INCLUDES
+#	$CFLAGS
+#	$WARN
+#
+# Bernard Heymann
+# 20041106 - 8
+
+set CURRDIR = `pwd`
+
+foreach DIR ( $argv )
+	cd $DIR
+	echo Change to directory: $DIR
+	foreach CFILE ( *.c )
+		set OFILE = `basename $CFILE .c`".o"
+		set COMPILE = 1
+		if ( -f $OFILE ) then
+			set COMPILE = 0
+			if ( `find $CFILE -newer $OFILE` == $CFILE ) set COMPILE = 1
+		endif
+		if ( $COMPILE )  then
+			echo "	$CFILE ---> $OFILE"
+			$CC -c $CFILE $INCLUDES $CFLAGS $WARN
+		endif
+	end
+	cd $CURRDIR
+end

@@ -1,0 +1,130 @@
+*********************************************************
+                  ELECTRA package
+          by LSBR at NIH in Bethesda, MD 
+*********************************************************
+
+ELECTRA (ELECtron Tomography Resolution Assessment) is a suite of programs 
+written to estimate the resolution of electron density volumes obtained by
+electron tomography. Basically, two different resolution methods
+(FSCe/o and NLOO) are implemented, along with some auxiliary tools for 
+preparation of data needed for analysis and postprocessing.
+See references for details on the estimation algorithms.
+
+--------------------------
+ References
+--------------------------
+The algorithms implemented in this package are being published in 
+
+Cardone, G., Grunewald, K., Steven, A.C., 2005
+A Resolution Criterion for Electron Tomography based on Cross-Validation
+J. Struct. Biol., Vol. 151, No. 2, pp. 117-129
+
+Please cite this paper in your own publications if you use Electra in
+your research endeavors.
+
+--------------------------
+ Installation
+--------------------------
+Electra is implemented in C/C++, and compiles unmodified on many
+Unix-like platforms. See INSTALL for requirements and detailed
+instructions.
+
+--------------------------
+ Memory constraints
+--------------------------
+et-fsceo:
+The memory required by the program to calculate the FSCe/o is at least
+twice the size of the tomogram, as determined after being converted to
+4 bytes values. For example, for a tomogram of size 2048x2048x500 the
+memory allocated is at least 16GB. This means that the program can not
+actually run on any platform with any tomogram.
+et-nloo_setup:
+The program generating the data required to estimate the resolution by
+NLOO does not load all the tomogram in memory, but partially reads into
+a memory buffer the portion each time it needs. The size of the buffer
+can be modified by the user (see option -buffer), and generally it is
+convenient to maximize it (but without exceeding the limits of the
+platform on which is intended to run), in order to reduce the number
+of accesses to the file.
+et-findbeads:
+Also in this case the memory required by the program is at least twice 
+the size of the tomogram, as determined after being converted to 4 bytes
+values. As a consequence the program can not actually run on any platform
+with any tomogram.
+ 
+--------------------------
+ Documentation
+--------------------------
+Type 'electra' for a list of the programs available along with a short
+description. Running a program without any option provides a description of
+its functionalities and a list of the accepted options.
+Basically, for each resolution method (FSCe/o and NLOO) the estimation is
+divided into two steps, corresponding to two separate program to run in
+sequence.
+The first step (programs et-fsceo_setup and et-nloo_setup) generates the data
+to be used for the resolution analysis: two volumes for the FSCe/o, and three
+tilt series for the NLOO.
+This step requires that IMOD be installed in order to work.
+The second step (programs et-fsceo and et-nloo), which does not rely on IMOD,
+calculates the resolution curves and the estimate at some thresholds as
+specified by the user.
+Examples of basic command lines to estimate resolution:
+-FSCe/o  assuming that tilt.com is the name of the parameter file used with
+         IMOD to perform the reconstruction, and that the file name of the
+         reconstructed tomogram is vol.mrc, the command lines are
+
+   	       et-fsceo_setup -imod tilt.com
+   	       et-fsceo -output res_plot.txt vol_0.mrc vol_1.mrc
+ 
+-NLOO    assuming that tilt.com is the name of the parameter file used with
+         IMOD to perform the reconstruction, the command lines are
+
+   	       et-nloo_setup -imod tilt.com
+   	       et-nloo -imod tilt.com -nloo2d -nloo3d -res_tilt
+   	       
+   	     If a subvolume (e.g a sphere) is selected from the tomogram for
+   	     the analysis, then the same selection is applied to both commands
+   	     
+           et-nloo_setup -imod tilt.com -sphere 150,340,98,60
+   	       et-nloo -imod tilt.com -sphere 150,340,98,60 -nloo2d -nloo3d -res_tilt
+    	     
+-----------------------------
+ Distribution of computation
+-----------------------------
+et-nloo_setup: since this program is the most computationally intensive, the
+calculation of projections can be distributed among multiple machines.
+The distribution mechanism is pretty simple: there is no internal
+parallelization, basically it is up to the user to launch different runs of the
+program on different machines, according to the rules of the distributing/queue
+system available. For each run you need to set the option "-proc x,N" , where N
+is the total number of processors intended to use, while x is the actual process
+to run (a value between 1 and N).
+Constraints:
+- the data need to be on a directory seen from all the machines, since they
+concurrently write to the same files;
+- the process #1 needs to be launched first, since it is also in charge to
+create the empty files that will be filled by all the other processors. If the
+distributed system is such that the completion of the process #1 is not
+guaranteed, or there is a migration mechanism that can relaunch the process,
+then it is convenient to add the option "-no_overwrite", which will not recreate
+the zero-filled output files. This option can be set for all the processes,
+since it is read only from the first one.
+
+--------------------------
+ Developers
+--------------------------
+The package is developed and maintained by Giovanni Cardone
+(cardoneg@mail.nih.gov).
+
+--------------------------
+ Feedback and bug reports
+--------------------------
+Feedback on usability issues, suggestions for new features, errors in the
+documentation, and bug reports are welcome. Email reports to
+           cardoneg@mail.nih.gov
+The package has been extensively tested only on MacOsX architecture, then
+any feedback about its performances on other operating systems is warmly
+welcomed. In case of a bug report, please give enough information to
+enable me to reproduce the  problem.
+ 
+

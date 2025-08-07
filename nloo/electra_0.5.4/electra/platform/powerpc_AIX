@@ -1,0 +1,13 @@
+# IBM AIX native compiler settings
+
+set C = 'cc'
+set CC = 'cc -+'
+if ( $SET32) then
+	set CFLAGS = '-O -DAIX -qmaxmem=8192 -qlanglvl=extended -qnoro'
+	set LINKOPTS = '-bdynamic -brtl'
+	set AR = 'ar -rcs -X32'
+else
+	set CFLAGS = '-q64 -O -DAIX -qmaxmem=8192 -qlanglvl=extended -qnoro'
+	set LINKOPTS = '-q64 -bdynamic -brtl'
+	set AR = 'ar -rcs -X64'
+endif

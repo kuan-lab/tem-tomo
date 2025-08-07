@@ -1,0 +1,6 @@
+# Aplha Tru64 native 64-bit compiler
+
+set CCVERSION = `cc -V | cut -f3 -d" "`
+set C = 'cc'
+set CC = 'cxx -x cxx'
+set CFLAGS = '-O -ieee -underflow_to_zero -tused'

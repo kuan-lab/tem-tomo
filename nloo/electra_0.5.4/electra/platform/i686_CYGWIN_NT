@@ -1,0 +1,6 @@
+# Redhat Cygwin gcc compiler
+
+set C = 'gcc'
+set CC = 'g++'
+set CFLAGS = '-O -ggdb -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
+set LINKOPTS = ''

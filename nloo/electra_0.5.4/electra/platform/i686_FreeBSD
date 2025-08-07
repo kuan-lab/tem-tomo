@@ -1,0 +1,25 @@
+# FreeBSD gcc compiler
+
+set CCVERSION = `gcc -v | & grep "gcc version" | cut -f3 -d" "`
+set C = 'gcc'			# Gnu C compiler
+set CC = 'c++'			# Gnu C++ compiler
+set CFLAGS = '-fPIC -O -ggdb -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
+set LINKOPTS = '-fPIC'
+
+set STDLIB = "/usr/lib"
+if ( ! ( -e $STDLIB/libstdc++.so ) ) then
+	if ( ! ( -e $STDLIB/libstdc++.a ) ) then
+		echo ""
+		echo "*****   No C++ library found!   *****"
+		echo "It should be something like $STDLIB/libstdc++.so or $STDLIB/libstdc++.a"
+		echo "If there are other libraries like that, try to create a link in $STDLIB such as:"
+		echo "	ln -s libstdc++.so.5 libstdc++.so"
+		echo ""
+		echo ""
+		echo "Here is a listing of possible libraries:"
+		ls -l $STDLIB/libstdc++*
+		echo ""
+		exit
+	endif
+endif
+

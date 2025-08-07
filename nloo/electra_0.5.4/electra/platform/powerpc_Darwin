@@ -1,0 +1,16 @@
+# MAC OSX Darwin gcc compiler
+
+set CCVERSION = `gcc -v | & grep "gcc version" | cut -f3 -d" "`
+set GCCMV = `echo $CCVERSION | cut -f1 -d"."`
+echo gcc major version: $GCCMV
+set C = 'gcc'
+set CC = 'g++'
+set CFLAGS = '-O3 -DDARWIN -fPIC'
+set LINKOPTS = '-fPIC -bind_at_load '
+set AR = 'ar rc'
+set ARCH = '-arch ppc -arch ppc64' 
+
+if ( ! $SET32 && ( `machine` == ppc970 ) && ( $GCCMV == "4" ) ) then
+	set CFLAGS = "$CFLAGS $ARCH "
+	set LINKOPTS = "-fPIC $ARCH -bind_at_load "
+endif

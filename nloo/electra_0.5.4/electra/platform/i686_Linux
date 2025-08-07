@@ -1,0 +1,8 @@
+# Redhat linux gcc compiler
+
+set CCVERSION = `gcc -v | & grep "gcc version" | cut -f3 -d" "`
+set C = 'gcc'			# Gnu C compiler
+set CC = 'g++'			# Gnu C++ compiler
+set CFLAGS = '-fPIC -O -ggdb -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
+set LINKOPTS = '-fPIC'
+
