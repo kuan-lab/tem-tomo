@@ -1080,8 +1080,8 @@ def generate_skip_bead_indices(
 
     for bead_idx in range(n_beads):
         for rx_ds, rz_ds in zip(r2x_list, r2z_list):
-            if bead_idx >= len(rx_ds):
-                continue  # this dataset has fewer beads; ignore
+            #if bead_idx >= len(rx_ds):
+            #    continue  # this dataset has fewer beads; ignore
             rx = rx_ds[bead_idx]
             rz = rz_ds[bead_idx]
             if (not np.isfinite(rx)) or (not np.isfinite(rz)) or rx < r2_cutoff or rz < r2_cutoff:
@@ -1089,6 +1089,11 @@ def generate_skip_bead_indices(
                 break  # no need to check other datasets for this bead
 
     return sorted(skip)
+
+def filter_by_index_excluding(nested_lists, skip_indices):
+    """Keep only elements whose index is NOT in skip_indices, for every sublist."""
+    skip = set(skip_indices)
+    return [[v for i, v in enumerate(sub) if i not in skip] for sub in nested_lists]
 
 # -----------------------------------------------------------------------------
 # Plotting helpers
@@ -1206,7 +1211,7 @@ def plot_fwhm_summary_line_by_dataset(
 
     # ---- plotting -----------------------------------------------------------
     x_pos = np.arange(len(dataset_names))
-    fig, ax_phys = plt.subplots(figsize=(4,3))
+    fig, ax_phys = plt.subplots(figsize=(4.5,3))
 
     # physical-unit error-bar lines (left axis)
     ax_phys.errorbar(
