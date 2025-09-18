@@ -53,6 +53,61 @@ def _safe_name(s: str) -> str:
 def _ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
+def _pt_to_xyz(pt) -> tuple[int, int, int]:
+    """Extract (x,y,z) from wk point objects or tuples/lists."""
+    if hasattr(pt, "x"):
+        return int(pt.x), int(pt.y), int(pt.z)
+    if isinstance(pt, dict) and all(k in pt for k in ("x", "y", "z")):
+        return int(pt["x"]), int(pt["y"]), int(pt["z"])
+    x, y, z = pt  # assume (x,y,z)
+    return int(x), int(y), int(z)
+
+def make_centered_roi_plans(
+    points: list,
+    box_size: int,
+    dataset_shape_xyz: tuple[int, int, int],
+) -> list[dict]:
+    """
+    For each bead center (global x,y,z), plan the dataset read (clipped to bounds)
+    and where to paste it into a NaN-padded cube so the bead stays centered.
+
+    Returns a list of dicts:
+      {
+        'offset': (rx0, ry0, rz0),       # dataset read offset (X,Y,Z)
+        'size':   (sx,  sy,  sz),        # dataset read size   (X,Y,Z)
+        'paste':  (px,  py,  pz),        # paste offset in target (X,Y,Z) coords
+        'target': (S,   S,   S),         # target cube (X,Y,Z) = (box_size, ...)
+      }
+    """
+    S = int(box_size)
+    hx = hy = hz = S // 2
+    Xmax, Ymax, Zmax = dataset_shape_xyz  # dataset bounds in (X,Y,Z)
+    plans = []
+    for pt in points:
+        xc, yc, zc = _pt_to_xyz(pt)
+
+        # Desired cube extents centered at bead (open-ended [start, end))
+        x0_d, x1_d = xc - hx, xc - hx + S
+        y0_d, y1_d = yc - hy, yc - hy + S
+        z0_d, z1_d = zc - hz, zc - hz + S
+
+        # Clip to dataset
+        rx0, rx1 = max(0, x0_d), min(Xmax, x1_d)
+        ry0, ry1 = max(0, y0_d), min(Ymax, y1_d)
+        rz0, rz1 = max(0, z0_d), min(Zmax, z1_d)
+
+        sx, sy, sz = max(0, rx1 - rx0), max(0, ry1 - ry0), max(0, rz1 - rz0)
+
+        # Paste offsets inside the SxSxS target (how far we had to clip)
+        px, py, pz = rx0 - x0_d, ry0 - y0_d, rz0 - z0_d
+
+        plans.append({
+            "offset": (int(rx0), int(ry0), int(rz0)),
+            "size":   (int(sx),  int(sy),  int(sz)),
+            "paste":  (int(px),  int(py),  int(pz)),
+            "target": (S, S, S),
+        })
+    return plans
 
 # -----------------------
 # Core download (fast path with threading)
@@ -99,6 +154,98 @@ def _download_one_box(
     return arr
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+def download_subvolumes_centered_nanpad(
+    dataset_name: str,
+    roi_plans: list[dict],
+    api_token: str,
+    organization_id: str,
+    webknossos_url: str = "https://webknossos.org",
+    mag_level: int = 1,
+    max_workers: int = 8,
+) -> list:
+    """
+    For each ROI plan:
+      - read clipped chunk from remote dataset using (absolute_offset, size)
+      - convert to (Z,Y,X)
+      - paste into a (S,S,S) float32 array prefilled with NaN so bead stays centered
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import threading
+
+    is_url = _is_url(dataset_name)
+    mag_str = str(mag_level)
+    subvols = [None] * len(roi_plans)
+
+    # discover primary layer once
+    try:
+        if is_url:
+            with wk.webknossos_context(token=api_token):
+                remote = wk.Dataset.open_remote(dataset_name)
+                layer_name = _get_primary_layer_name(remote)
+        else:
+            with wk.webknossos_context(url=webknossos_url, token=api_token):
+                remote = wk.Dataset.open_remote(dataset_name, organization_id=organization_id)
+                layer_name = _get_primary_layer_name(remote)
+    except Exception as e:
+        _log(f"    ✗ Could not open dataset to discover layer: {e}")
+        return []
+
+    _tls = threading.local()
+
+    def _get_ds():
+        if getattr(_tls, "ds", None) is not None:
+            return _tls.ds
+        if is_url:
+            _tls.ctx = wk.webknossos_context(token=api_token)
+            _tls.ctx.__enter__()
+            _tls.ds = wk.Dataset.open_remote(dataset_name)
+        else:
+            _tls.ctx = wk.webknossos_context(url=webknossos_url, token=api_token)
+            _tls.ctx.__enter__()
+            _tls.ds = wk.Dataset.open_remote(dataset_name, organization_id=organization_id)
+        return _tls.ds
+
+    def _worker(i: int, plan: dict):
+        try:
+            ds = _get_ds()
+            (rx0, ry0, rz0) = plan["offset"]
+            (sx,  sy,  sz)  = plan["size"]
+            (px,  py,  pz)  = plan["paste"]
+            (Sx,  Sy,  Sz)  = plan["target"]  # all equal to box_size
+
+            # If nothing to read (should not happen), return all-NaN cube
+            import numpy as np
+            tgt = np.full((Sz, Sy, Sx), np.nan, dtype=np.float32)
+
+            if sx <= 0 or sy <= 0 or sz <= 0:
+                return i, tgt  # all NaN
+
+            # WK uses (X,Y,Z) for offsets/sizes; read and convert to (Z,Y,X)
+            vol = ds.get_layer(layer_name).get_mag(mag_str).read(
+                absolute_offset=(rx0, ry0, rz0),
+                size=(sx, sy, sz),
+            )
+            arr = np.asarray(vol)  # (C,Y,X,Z) or (Y,X,Z)
+            if arr.ndim == 4:
+                arr = arr.squeeze(0)  # (Y,X,Z)
+            arr = arr.transpose(2, 0, 1)  # -> (Z,Y,X) = (sz,sy,sx)
+
+            # paste into NaN-padded target so bead stays centered
+            tgt[pz:pz+sz, py:py+sy, px:px+sx] = arr.astype(np.float32)
+            return i, tgt
+        except Exception as e:
+            return i, e
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futs = [ex.submit(_worker, i, plan) for i, plan in enumerate(roi_plans)]
+        for f in as_completed(futs):
+            i, res = f.result()
+            if isinstance(res, Exception):
+                _log(f"    ⚠️  Failed ROI {i}: {res}")
+            else:
+                subvols[i] = res
+
+    return [sv for sv in subvols if sv is not None]
 
 def download_subvolumes_parallel(
     dataset_name: str,
@@ -227,64 +374,50 @@ def process_tomogram(
         ann = wk.Annotation.download(annotation_id)
     pts = utils.get_annotation_points(ann)
     _log(f"  • Downloaded annotation: {ann.name} | beads: {len(pts)}")
-    
+
     for recon in recon_labels:
         out_path = t_root / f"{_safe_name(recon)}.npz"
+        if out_path.exists() and not overwrite:
+            _log(f"  • {recon}: exists → skip (use --overwrite to redo)")
+            continue
 
         _log(f"  • Recon: {recon}")
 
-        # 2) Bounds for edge-safe boxes (respect URL vs name rules)
+       # 2) Bounds for edge-safe planning (we will NOT shift; we will NaN-pad)
         try:
             if _is_url(recon):
                 with wk.webknossos_context(token=api_token):
                     ds_remote = wk.Dataset.open_remote(recon)
+                    bounds = ds_remote.calculate_bounding_box()
             else:
                 with wk.webknossos_context(url=webknossos_url, token=api_token):
                     ds_remote = wk.Dataset.open_remote(recon, organization_id=organization_id)
-            bounds = ds_remote.calculate_bounding_box()
+                    bounds = ds_remote.calculate_bounding_box()
         except Exception as e:
-            _log(f"    ✗ Could not open dataset or compute bounds: {e}")
-            continue
-
-        # Discover layer & mag existence (no data read)
-        try:
-            layer_name = _get_primary_layer_name(ds_remote)
-            # Ensure mag exists; this raises if unavailable
-            _ = ds_remote.get_layer(layer_name).get_mag(str(mag_level))
-        except Exception as e:
-            _log(f"    ✗ Layer/mag check failed (layer='{layer_name if 'layer_name' in locals() else '?'}', mag={mag_level}): {e}")
+            _log(f"    ✗ Could not open dataset for bounds: {e}")
             continue
 
         dataset_shape_xyz = (bounds.size.x, bounds.size.y, bounds.size.z)
-        boxes = utils.compute_bounding_boxes_flex(pts, box_size=box_size, dataset_shape=dataset_shape_xyz)
-        _log(f"    ✓ Dataset OK | layer='{layer_name}' mag={mag_level} | bounds={dataset_shape_xyz} | beads={len(pts)} | boxes={len(boxes)}")
 
-        if dry_run:
-            # Report what would happen, then skip I/O
-            _log(f"    (dry-run) Would save → {out_path}")
-            continue
+        # Plan centered ROIs with NaN padding (no shifting)
+        plans = make_centered_roi_plans(pts, box_size=box_size, dataset_shape_xyz=dataset_shape_xyz)
 
-        # Skip if file exists and not overwriting
-        if out_path.exists() and not overwrite:
-            _log(f"    - Exists → skip (use --overwrite to redo)")
-            continue
-
-        # 3) Fast parallel downloads
-        subvols = download_subvolumes_parallel(
+        # 3) Download (centered, NaN-padded)
+        subvols = download_subvolumes_centered_nanpad(
             dataset_name=recon,
-            bounding_boxes=boxes,
+            roi_plans=plans,
             api_token=api_token,
             organization_id=organization_id,
             webknossos_url=webknossos_url,
             mag_level=mag_level,
             max_workers=max_workers,
         )
-        n_ok, n_boxes = len(subvols), len(boxes)
-        _log(f"    - Downloaded {n_ok}/{n_boxes} subvolumes")
+        _log(f"    - Downloaded {len(subvols)}/{len(plans)} subvolumes (NaN-padded)")
 
         # 4) Save
         utils.save_subvolumes_to_npz(subvols, pts, out_path)
         _log(f"    - Saved → {out_path}")
+
 
 # -----------------------
 # Config parsing

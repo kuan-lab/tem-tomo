@@ -342,15 +342,27 @@ def fit_gaussian_and_compute_fwhm(profile: np.ndarray, *,
             plt.title(title)
             plt.xlabel("Position (px)")
             plt.ylabel("Intensity")
-            plt.legend() 
+            #plt.legend() 
+            plt.legend(bbox_to_anchor=(2, 0.5), loc='center right', borderaxespad=0.)
             plt.grid(True)
             plt.show()
-
+            
         return fwhm_eff_px, popt, r_squared
 
     except Exception as e:
         print(f"⚠️ Gaussian fit failed: {e}")
         return np.nan, [np.nan] * 4, np.nan
+
+def _trim_profile_nan_edges(profile: np.ndarray, *, min_len: int = 7) -> np.ndarray:
+    """Keep the contiguous finite block from first to last finite sample."""
+    y = np.asarray(profile, dtype=float)
+    finite = np.isfinite(y)
+    if not finite.any():
+        return y[:0]
+    i0 = int(np.argmax(finite))                          # first True
+    i1 = len(y) - int(np.argmax(finite[::-1]))          # one past last True
+    seg = y[i0:i1]
+    return seg if seg.size >= min_len else y[:0]
 
 
 def spot_check_fit_minimal(
@@ -363,18 +375,21 @@ def spot_check_fit_minimal(
     linewidth: int = 1,
     bead_diam_nm: float = 0.0,          # usually 0 (no deconv)
     pixel_size_nm: float | None = None, # needed only if bead_diam_nm > 0
-
-    
 ) -> Dict[str, Dict[str, Any]]:
     """
-    Minimal-risk spot-check:
+    NaN-aware spot-check:
       - loads ROI,
       - extracts 1-D center profiles with your extract_center_profiles_old,
+      - trims each profile to the finite run around its minimum (handles NaN padding),
       - calls your fit_gaussian_and_compute_fwhm (which plots per-axis),
       - returns per-axis (fwhm_px, popt, r2).
 
-    It intentionally relies on your existing fitting & plotting to avoid new code paths.
+    Note: if you use linewidth > 1, the old extractor averages with np.mean and can
+    still produce NaNs. Prefer linewidth=1 with NaN-padded ROIs, or we can add a
+    nan-aware extractor later.
     """
+    import matplotlib.pyplot as plt
+
     npz_path = Path(root_dir) / _safe_name(tomogram) / f"{_safe_name(recon_label)}.npz"
     data = np.load(npz_path, allow_pickle=True)
     subvols = data["subvolumes"]
@@ -382,19 +397,33 @@ def spot_check_fit_minimal(
         raise IndexError(f"bead_index {bead_index} out of range [0, {len(subvols)-1}] for {npz_path.name}")
 
     vol = subvols[bead_index]
+    if vol.ndim != 3:
+        raise ValueError(f"Expected 3D (Z,Y,X), got {vol.shape}")
+
+    # centerline profiles (Z,Y,X) -> dict {"X","Y","Z"}
     profiles = extract_center_profiles_old(vol, linewidth=linewidth)
 
     results: Dict[str, Dict[str, Any]] = {}
     for axis in axes_to_show:
         if axis not in ("X", "Y", "Z"):
             continue
+
+        raw = profiles[axis]
+        cleaned = _trim_profile_nan_edges(raw, min_len=7)
+
         title = f"{tomogram} | {recon_label} | bead {bead_index} | axis {axis}"
+        if cleaned.size == 0:
+            # not enough finite samples to fit
+            print(f"⚠️  Not enough finite samples to fit ({axis}); skipping.")
+            results[axis] = {"fwhm_px": np.nan, "popt": [np.nan]*4, "r2": np.nan}
+            continue
+
         fwhm_px, popt, r2 = fit_gaussian_and_compute_fwhm(
-            profiles[axis],
+            cleaned,
             bead_diam_nm=bead_diam_nm,
-            pixel_size_nm=pixel_size_nm,
-            title=title,
-            plot_fit=True,   # <-- let your existing function render the plot
+            pixel_size_nm=pixel_size_nm if bead_diam_nm > 0 else None,
+            title=title + f" (n={cleaned.size})",
+            plot_fit=True,
         )
         results[axis] = {"fwhm_px": fwhm_px, "popt": popt, "r2": r2}
 
@@ -430,7 +459,7 @@ def generate_skip_bead_indices(
             if (not np.isfinite(rx)) or (not np.isfinite(rz)) or rx < r2_cutoff or rz < r2_cutoff:
                 skip.add(bead_idx)
                 break  # no need to check other datasets for this bead
-
+    
     return sorted(skip)
 
 def filter_by_index_excluding(nested_lists, skip_indices):
@@ -439,8 +468,30 @@ def filter_by_index_excluding(nested_lists, skip_indices):
     return [[v for i, v in enumerate(sub) if i not in skip] for sub in nested_lists]
 
 
-# --- tiny parser for recon label -> (num_proj, max_angle) ---
 def parse_recon_label(recon_label: str) -> tuple[float, float]:
+    """
+    Extract (num_proj, max_angle) from a recon label, robust to prefixes and URLs.
+
+    Matches the **last** occurrence of "<num>[_-]*lim<num>" so it works for:
+      - "11_lim15_tomo10a_16bit"          -> (11, 15)
+      - "Mouse..._tomo11a_11_lim15_16bit" -> (11, 15)
+      - full URLs ".../Mouse..._11_lim15_16bit#view..." -> (11, 15)
+
+    Returns (nan, nan) if not found.
+    """
+    # keep only the last path segment; strip fragments/query
+    base = recon_label.rsplit("/", 1)[-1].split("#", 1)[0].split("?", 1)[0]
+
+    # find the LAST "<digits>[optional _ or -]lim<digits>"
+    pat = re.compile(r"(?P<num_proj>\d+)\s*[_-]*\s*lim\s*(?P<max_ang>\d+)", re.IGNORECASE)
+    match = None
+    for m in pat.finditer(base):
+        match = m
+    if match:
+        return float(match.group("num_proj")), float(match.group("max_ang"))
+    return float("nan"), float("nan")
+# --- tiny parser for recon label -> (num_proj, max_angle) ---
+def parse_recon_label_old(recon_label: str) -> tuple[float, float]:
     """
     Extract (num_proj, max_angle) from labels like:
       '11_lim15_tomo10a_16bit' or '..._41_lim60_tomo10a_16bit'
@@ -476,15 +527,9 @@ def fits_dataframe_from_config(
 ) -> pd.DataFrame:
     """
     Iterate all tomograms in YAML, fit X/Y/Z for every bead in every recon,
-    compute per-tomogram skip indices from R² (X & Z), filter beads, and
-    return a tidy DataFrame with one row per (kept) bead fit.
-
-    Expected YAML fields per tomogram entry:
-      - tomogram: str
-      - recon_labels: list[str]
-      - thickness: number (nm)     <-- new
-      - pxl_size: number (nm/px)   <-- new
-    Other fields (annotation_id, box_size, etc.) are ignored here.
+    compute per-tomogram skip indices from R² (X & Z), and return a tidy DataFrame
+    with one row per (kept) bead fit. NaN-padded ROIs are handled by trimming each
+    1-D profile to the finite run around its minimum before fitting.
     """
     cfg = yaml.safe_load(Path(config_path).read_text())
     rows: list[dict] = []
@@ -495,35 +540,59 @@ def fits_dataframe_from_config(
         pxl_size = float(entry.get("pxl_size", float("nan")))
         recon_labels = list(entry["recon_labels"])
 
-        # 1) Compute per-recon fwhm and r2 lists (one value per bead)
         all_fwhms_x, all_fwhms_y, all_fwhms_z = [], [], []
         all_r2s_x,   all_r2s_y,   all_r2s_z   = [], [], []
+        beads_per_recon: list[int] = []
 
         for recon in recon_labels:
             subvols, _ = _load_recon_npz(root_dir, tomogram, recon)
+            beads_per_recon.append(len(subvols))
 
             fwhm_x, fwhm_y, fwhm_z = [], [], []
             r2_x,   r2_y,   r2_z   = [], [], []
 
             for vol in subvols:
-                # reuse your existing function
+                # Get geometric-center profiles (may include NaNs at the ends)
                 profs = extract_center_profiles_old(vol, linewidth=linewidth)
 
-                fx, px, rx = fit_gaussian_and_compute_fwhm(
-                    profs["X"], bead_diam_nm=bead_diam_nm,
-                    pixel_size_nm=pxl_size if bead_diam_nm > 0 else None,
-                    title="", plot_fit=False
-                )
-                fy, py, ry = fit_gaussian_and_compute_fwhm(
-                    profs["Y"], bead_diam_nm=bead_diam_nm,
-                    pixel_size_nm=pxl_size if bead_diam_nm > 0 else None,
-                    title="", plot_fit=False
-                )
-                fz, pz, rz = fit_gaussian_and_compute_fwhm(
-                    profs["Z"], bead_diam_nm=bead_diam_nm,
-                    pixel_size_nm=pxl_size if bead_diam_nm > 0 else None,
-                    title="", plot_fit=False
-                )
+                # NaN-aware trimming around the (finite) minimum for each axis
+                px = _trim_profile_nan_edges(profs["X"], min_len=7)
+                py = _trim_profile_nan_edges(profs["Y"], min_len=7)
+                pz = _trim_profile_nan_edges(profs["Z"], min_len=7)
+
+                # Fit each axis if we have enough finite samples; else record NaNs
+                if px.size:
+                    fx, _, rx = fit_gaussian_and_compute_fwhm(
+                        px,
+                        bead_diam_nm=bead_diam_nm,
+                        pixel_size_nm=pxl_size if bead_diam_nm > 0 else None,
+                        title="",
+                        plot_fit=False,
+                    )
+                else:
+                    fx, rx = np.nan, np.nan
+
+                if py.size:
+                    fy, _, ry = fit_gaussian_and_compute_fwhm(
+                        py,
+                        bead_diam_nm=bead_diam_nm,
+                        pixel_size_nm=pxl_size if bead_diam_nm > 0 else None,
+                        title="",
+                        plot_fit=False,
+                    )
+                else:
+                    fy, ry = np.nan, np.nan
+
+                if pz.size:
+                    fz, _, rz = fit_gaussian_and_compute_fwhm(
+                        pz,
+                        bead_diam_nm=bead_diam_nm,
+                        pixel_size_nm=pxl_size if bead_diam_nm > 0 else None,
+                        title="",
+                        plot_fit=False,
+                    )
+                else:
+                    fz, rz = np.nan, np.nan
 
                 fwhm_x.append(fx); fwhm_y.append(fy); fwhm_z.append(fz)
                 r2_x.append(rx);   r2_y.append(ry);   r2_z.append(rz)
@@ -531,18 +600,28 @@ def fits_dataframe_from_config(
             all_fwhms_x.append(fwhm_x); all_fwhms_y.append(fwhm_y); all_fwhms_z.append(fwhm_z)
             all_r2s_x.append(r2_x);     all_r2s_y.append(r2_y);     all_r2s_z.append(r2_z)
 
-        # 2) Per-tomogram skip indices from X & Z R²
+        # --- per-tomogram counts & skip set (unchanged) ---
+        n_beads_total = int(beads_per_recon[0]) if beads_per_recon else 0
+        if any(n != n_beads_total for n in beads_per_recon):
+            print(f"⚠️ bead count mismatch across recons for {tomogram}: {beads_per_recon} "
+                  f"(using first: {n_beads_total})")
+
         skip_indices = generate_skip_bead_indices(all_r2s_x, all_r2s_z, r2_cutoff=r2_cutoff)
+        kept_indices = [i for i in range(n_beads_total) if i not in set(skip_indices)]
+        n_beads_pass = len(kept_indices)
 
-        # 3) Filter all FWHM lists by skip set
-        filt_x = filter_by_index_excluding(all_fwhms_x, skip_indices)
-        filt_y = filter_by_index_excluding(all_fwhms_y, skip_indices)
-        filt_z = filter_by_index_excluding(all_fwhms_z, skip_indices)
+        pct = (100.0 * n_beads_pass / n_beads_total) if n_beads_total else 0.0
+        print(f"[{tomogram}] beads: total={n_beads_total}, pass (R²≥{r2_cutoff})={n_beads_pass} ({pct:.1f}%)")
 
-        # 4) Emit tidy rows for every kept bead in every recon
-        for recon, fxs, fys, fzs in zip(recon_labels, filt_x, filt_y, filt_z):
+        # --- emit rows for every kept bead in every recon (unchanged except bead_id) ---
+        for r_idx, recon in enumerate(recon_labels):
             num_proj, max_angle = parse_recon_label(recon)
-            for fx, fy, fz in zip(fxs, fys, fzs):
+            fxs = all_fwhms_x[r_idx]; fys = all_fwhms_y[r_idx]; fzs = all_fwhms_z[r_idx]
+
+            for bead_id in kept_indices:
+                if bead_id >= len(fxs) or bead_id >= len(fys) or bead_id >= len(fzs):
+                    continue
+                fx, fy, fz = fxs[bead_id], fys[bead_id], fzs[bead_id]
                 rows.append({
                     "tomogram": tomogram,
                     "thickness": thickness,
@@ -550,16 +629,19 @@ def fits_dataframe_from_config(
                     "recon_label": recon,
                     "num_proj": num_proj,
                     "max_angle": max_angle,
+                    "bead_id": bead_id,              # 0-based, stable within tomogram
+                    "n_beads_total": n_beads_total,  # same for all rows of this tomogram
+                    "n_beads_pass": n_beads_pass,    # same for all rows of this tomogram
                     "fwhm_x": fx,
                     "fwhm_y": fy,
                     "fwhm_z": fz,
-                    # new: physical units (nm)
                     "res_nm_x": fx * pxl_size if np.isfinite(fx) and np.isfinite(pxl_size) else np.nan,
                     "res_nm_y": fy * pxl_size if np.isfinite(fy) and np.isfinite(pxl_size) else np.nan,
                     "res_nm_z": fz * pxl_size if np.isfinite(fz) and np.isfinite(pxl_size) else np.nan,
                 })
 
     return pd.DataFrame(rows)
+
 
 def plot_fwhm_z_summary_line_by_thickness(
     df,
