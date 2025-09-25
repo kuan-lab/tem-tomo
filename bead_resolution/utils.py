@@ -364,6 +364,39 @@ def _trim_profile_nan_edges(profile: np.ndarray, *, min_len: int = 7) -> np.ndar
     seg = y[i0:i1]
     return seg if seg.size >= min_len else y[:0]
 
+def estimate_psf_fwhm_from_top_hat(fwhm_meas_px: float,
+                                   bead_diam_nm: float,
+                                   pixel_size_nm: float) -> float:
+    """
+    Estimate PSF FWHM (nm) when the object is a top-hat bead.
+
+    Parameters
+    ----------
+    fwhm_meas_px : float
+        FWHM of the fitted Gaussian (in pixels).
+    bead_diam_nm : float
+        Physical bead diameter (nm), e.g. 5.0.
+    pixel_size_nm : float
+        Detector sampling in nm/px.
+
+    Returns
+    -------
+    float
+        Estimated PSF FWHM in nm.
+    """
+    fwhm_meas_px = np.asarray(fwhm_meas_px, dtype=float)
+
+    fwhm_meas_nm = fwhm_meas_px * pixel_size_nm
+    # Convert to sigma
+    sigma_meas = fwhm_meas_nm / 2.355
+
+    # Variance of a 1-D top-hat of width D
+    var_bead = (bead_diam_nm ** 2) / 12.0
+    if sigma_meas**2 <= var_bead:
+        #raise ValueError("Measured profile is narrower than the bead itself.")
+        return(np.nan)
+    sigma_psf = np.sqrt(sigma_meas**2 - var_bead)
+    return 2.355 * sigma_psf   # back to FWHM
 
 def spot_check_fit_minimal(
     tomogram: str,
@@ -466,7 +499,6 @@ def filter_by_index_excluding(nested_lists, skip_indices):
     """Keep only elements whose index is NOT in skip_indices, for every sublist."""
     skip = set(skip_indices)
     return [[v for i, v in enumerate(sub) if i not in skip] for sub in nested_lists]
-
 
 def parse_recon_label(recon_label: str) -> tuple[float, float]:
     """
@@ -572,6 +604,7 @@ def fits_dataframe_from_config(
                 else:
                     fx, rx = np.nan, np.nan
 
+                
                 if py.size:
                     fy, _, ry = fit_gaussian_and_compute_fwhm(
                         py,
@@ -707,3 +740,4 @@ def plot_fwhm_z_summary_line_by_thickness(
     sns.despine(fig)
 
     return fig, ax
+
