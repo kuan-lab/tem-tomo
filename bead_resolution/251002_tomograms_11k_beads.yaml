@@ -1,0 +1,13 @@
+
+tomograms:
+  - tomogram: MouseCerebellum_A2S1_SA11k_de64_tomo26
+    annotation_id: https://webknossos.org/annotations/68de88290100000101da20b7#287,860,16,0,0.377,100
+    thickness: 500
+    pxl_size: 1.4
+    box_size: 36
+    recon_labels:
+      - MouseCerebellum_A2S1_SA11k_de64_tomo26a_41_lim60_16bit
+      - MouseCerebellum_A2S1_SA11k_de64_tomo26a_31_lim45_16bit
+      - MouseCerebellum_A2S1_SA11k_de64_tomo26a_21_lim30_16bit
+      - MouseCerebellum_A2S1_SA11k_de64_tomo26a_11_lim15_16bit
+
