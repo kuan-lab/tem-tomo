@@ -11,3 +11,24 @@ tomograms:
       - MouseCerebellum_A2S1_SA11k_de64_tomo26a_21_lim30_16bit
       - MouseCerebellum_A2S1_SA11k_de64_tomo26a_11_lim15_16bit
 
+  - tomogram: MouseCerebellum_A3S1_SA11k_de64_tomo17
+    annotation_id: https://webknossos.org/annotations/68f1064001000013047d13d3#1031,1030,260,0,2
+    thickness: 750
+    pxl_size: 1.4
+    box_size: 36
+    recon_labels:
+      - MouseCerebellum_A3S1_SA11k_de64_tomo17_41_lim60_16bit
+      - MouseCerebellum_A3S1_SA11k_de64_tomo17_31_lim45_16bit
+      - MouseCerebellum_A3S1_SA11k_de64_tomo17_21_lim30_16bit
+      - MouseCerebellum_A3S1_SA11k_de64_tomo17_11_lim15_16bit
+
+  - tomogram: MouseCerebellum_A4S1_SA11k_de64_tomo12
+    annotation_id: https://webknossos.org/annotations/68f10ccc0100002a047d161a#1380,151,686,0,0.327,165
+    thickness: 1000
+    pxl_size: 1.4
+    box_size: 36
+    recon_labels:
+      - MouseCerebellum_A4S1_SA11k_de64_tomo12_41_lim60_16bit
+      - MouseCerebellum_A4S1_SA11k_de64_tomo12_31_lim45_16bit
+      - MouseCerebellum_A4S1_SA11k_de64_tomo12_21_lim30_16bit
+      - MouseCerebellum_A4S1_SA11k_de64_tomo12_11_lim15_16bit

@@ -675,69 +675,262 @@ def fits_dataframe_from_config(
 
     return pd.DataFrame(rows)
 
+from pathlib import Path
+from typing import Sequence, Tuple
+import numpy as np
+import matplotlib.pyplot as plt
 
-def plot_fwhm_z_summary_line_by_thickness(
-    df,
+def _safe_name(s: str) -> str:
+    return "".join(c if c.isalnum() or c in ("_", "-", ".") else "_" for c in s)
+
+def plot_bead_views_across_recons(
+    tomogram: str,
+    recon_labels: Sequence[str],
+    bead_index: int,
+    root_dir: str | Path = "data",
     *,
-    units: str = "nm",                 # "nm" or "px"
-    max_angs: list[int] | None = None, # x-axis order; if None, inferred
-    theta_labels: list[str] | None = None,
-    agg: str = "median",               # "median" or "mean"
-    figsize: tuple[int, int] = (4, 2),
+    view_axis: str = "YZ",                  # "YZ" or "XZ"
+    rotate_side_90: bool = True,            # rotate side view by 90°
+    clip_percentile: Tuple[float, float] | None = (1, 99),
+    cmap: str = "gray",
+    title: str | None = None,
+    save_path: str | Path | None = None,
 ):
     """
-    Single-axis plot: FWHM_Z vs tilt range, one line per thickness.
+    Plot a horizontal grid (2 rows × N columns): top=XY, bottom=(YZ or XZ) for the same bead
+    across multiple reconstructions.
 
-    df must have columns: ['thickness','pxl_size','max_angle','fwhm_z'].
+    - Handles NaN-padded ROIs.
+    - Shared contrast per row (XY column shares vmin/vmax; side-view row shares vmin/vmax).
+    - `view_axis` selects which side view to show; `rotate_side_90` rotates that image by 90°.
     """
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+    root_dir = Path(root_dir)
+    items = []
+    failed = []
+    side_axis = view_axis.upper()
+    if side_axis not in ("YZ", "XZ"):
+        raise ValueError("view_axis must be 'YZ' or 'XZ'")
 
-    if max_angs is None:
-        max_angs = sorted(df["max_angle"].dropna().unique().tolist())
-    if theta_labels is not None and len(theta_labels) != len(max_angs):
-        raise ValueError("theta_labels must have same length as max_angs")
+    # -------- load slices --------
+    for recon in recon_labels:
+        npz_path = root_dir / _safe_name(tomogram) / f"{_safe_name(recon)}.npz"
+        if not npz_path.exists():
+            failed.append((recon, "missing npz"))
+            continue
+        d = np.load(npz_path, allow_pickle=True)
+        subs = d["subvolumes"]
+        if not (0 <= bead_index < len(subs)):
+            failed.append((recon, f"bead_index out of range [0,{len(subs)-1}]"))
+            continue
 
-    # choose y column / label
-    dfx = df.copy()
-    if units == "nm":
-        dfx["fwhm_z_nm"] = dfx["fwhm_z"] * dfx["pxl_size"]
-        ycol, ylab = "fwhm_z_nm", "Resolution (nm)"
-    elif units == "px":
-        ycol, ylab = "fwhm_z", "Resolution (pixels)"
-    else:
-        raise ValueError("units must be 'nm' or 'px'")
+        vol = subs[bead_index]
+        if vol.ndim != 3:
+            failed.append((recon, f"bad volume shape {vol.shape}"))
+            continue
 
-    # aggregate across beads (and tomograms) for each (thickness, angle)
-    agg_fun = {"median": np.nanmedian, "mean": np.nanmean}[agg]
-    g = (dfx.groupby(["thickness", "max_angle"], as_index=False)[ycol]
-            .agg(value=agg_fun)
-            .rename(columns={"value": ycol}))
+        Z, Y, X = vol.shape
+        zc, yc, xc = Z // 2, Y // 2, X // 2
 
-    # enforce x order
-    g = g[g["max_angle"].isin(max_angs)].copy()
-    g["max_angle"] = pd.Categorical(g["max_angle"], categories=max_angs, ordered=True)
-    g.sort_values(["thickness", "max_angle"], inplace=True)
+        # XY at mid-Z
+        img_xy = vol[zc, :, :].astype(float)            # (Y, X)
 
-    # plot
-    sns.set_theme(rc={"lines.linewidth": 0.9}, style="ticks")
-    fig, ax = plt.subplots(1, 1, figsize=figsize, constrained_layout=True)
+        # side view selection
+        if side_axis == "YZ":
+            # slice at mid-X → (Z, Y); display as (Y, Z) then optional rotate
+            side = vol[:, :, xc].astype(float).transpose(1, 0)  # (Y, Z)
+        else:  # "XZ"
+            # slice at mid-Y → (Z, X); display as (X, Z) then optional rotate
+            side = vol[:, yc, :].astype(float).transpose(1, 0)  # (X, Z)
 
-    for t, sub in g.groupby("thickness", sort=True):
-        ax.plot(sub["max_angle"].cat.codes, sub[ycol], marker="o", label=f"{t:.0f} nm")
+        if rotate_side_90:
+            side = np.rot90(side, k=1)  # 90° CCW
 
-    xticks = list(range(len(max_angs)))
-    ax.set_xticks(xticks)
-    if theta_labels is None:
-        theta_labels = [f"±{int(a)}°" for a in max_angs]
-    ax.set_xticklabels(theta_labels)
+        items.append({
+            "label": recon.rsplit("/", 1)[-1],
+            "XY": img_xy,
+            "SIDE": side,
+        })
 
-    ax.set_xlabel("Tilt Range")
-    ax.set_ylabel(ylab)
-    ax.legend(title="Thickness", fontsize=8)
-    sns.despine(fig)
+    if not items:
+        msg = "No valid recon subvolumes found to plot."
+        if failed:
+            msg += "\n" + "\n".join([f" - {r}: {m}" for r, m in failed])
+        raise RuntimeError(msg)
 
-    return fig, ax
+    # -------- shared contrast (NaN-aware) --------
+    def _vrange(key):
+        if clip_percentile is None:
+            return (None, None)
+        vec = np.concatenate([np.ravel(it[key]) for it in items])
+        lo = np.nanpercentile(vec, clip_percentile[0])
+        hi = np.nanpercentile(vec, clip_percentile[1])
+        return float(lo), float(hi)
 
+    v_xy = _vrange("XY")
+    v_side = _vrange("SIDE")
+
+    # -------- plot 2 × N --------
+    n = len(items)
+    fig, axes = plt.subplots(2, n, figsize=(2.2 * n, 4.6), constrained_layout=True)
+    if n == 1:
+        axes = np.array([[axes[0]], [axes[1]]])  # force (2,1)
+
+    for j, it in enumerate(items):
+        ax_xy = axes[0, j]
+        ax_sd = axes[1, j]
+
+        ax_xy.imshow(it["XY"], cmap=cmap, origin="lower",
+                     vmin=None if v_xy[0] is None else v_xy[0],
+                     vmax=None if v_xy[1] is None else v_xy[1])
+        ax_sd.imshow(it["SIDE"], cmap=cmap, origin="lower",
+                     vmin=None if v_side[0] is None else v_side[0],
+                     vmax=None if v_side[1] is None else v_side[1])
+
+        ax_xy.set_title(it["label"], fontsize=9)
+        ax_sd.set_title("")  # clean
+        for ax in (ax_xy, ax_sd):
+            ax.set_xticks([]); ax.set_yticks([])
+
+    # row labels on left
+    axes[0, 0].set_ylabel("XY", fontsize=10)
+    axes[1, 0].set_ylabel(side_axis, fontsize=10)
+
+    if title is None:
+        title = f"{tomogram}  |  bead {bead_index}  |  side={side_axis}{' (rot90)' if rotate_side_90 else ''}"
+    fig.suptitle(title, fontsize=11)
+
+    if failed:
+        print("Skipped recons:")
+        for r, m in failed:
+            print(f"  • {r}: {m}")
+
+    if save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=200, bbox_inches="tight")
+
+    return fig, axes
+
+from pathlib import Path
+from typing import Sequence, Dict, Any
+import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
+from typing import Sequence, Dict, Any
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_z_profiles_across_recons(
+    tomogram: str,
+    recon_labels: Sequence[str],
+    bead_index: int,
+    root_dir: str | Path = "data",
+    *,
+    linewidth: int = 1,
+    bead_diam_nm: float = 0.0,            # set to 5.0 to deconvolve a 5 nm bead
+    pixel_size_nm: float | None = None,   # needed only if bead_diam_nm > 0
+    min_len: int = 7,                     # minimum samples after NaN-edge trim
+    title: str | None = None,
+    save_path: str | Path | None = None,
+    normalize: bool = True,               # normalize y to [0,1] per profile
+) -> tuple[plt.Figure, plt.Axes, Dict[str, Dict[str, Any]]]:
+    """
+    Plot Z centerline profiles + Gaussian fits for the same bead across multiple recons.
+    - NaN-padded ROIs are handled by trimming NaN edges before fitting.
+    - Each recon is plotted in a different color; fits are overlaid.
+    - Prints R² and FWHM (px and, if available, nm) to stdout.
+
+    Returns
+    -------
+    fig, ax, results
+      results[recon_label] = {"fwhm_px": float, "fwhm_nm": float|nan, "r2": float, "n": int}
+    """
+    root_dir = Path(root_dir)
+    results: Dict[str, Dict[str, Any]] = {}
+    fig, ax = plt.subplots(1, 1, figsize=(5.6, 3.2), constrained_layout=True)
+
+    for recon in recon_labels:
+        npz_path = root_dir / _safe_name(tomogram) / f"{_safe_name(recon)}.npz"
+        if not npz_path.exists():
+            print(f"⚠️  {recon}: missing NPZ at {npz_path} — skipping")
+            continue
+
+        d = np.load(npz_path, allow_pickle=True)
+        subs = d["subvolumes"]
+        if not (0 <= bead_index < len(subs)):
+            print(f"⚠️  {recon}: bead_index {bead_index} out of range [0,{len(subs)-1}] — skipping")
+            continue
+
+        vol = subs[bead_index]
+        if vol.ndim != 3:
+            print(f"⚠️  {recon}: bad volume shape {vol.shape} — skipping")
+            continue
+
+        # centerline profiles (Z,Y,X) -> dict
+        profs = extract_center_profiles_old(vol, linewidth=linewidth)
+
+        # NaN-edge trim for Z profile
+        z_raw = np.asarray(profs["Z"], dtype=float)
+        z_clean = _trim_profile_nan_edges(z_raw, min_len=min_len)
+        if z_clean.size == 0:
+            print(f"⚠️  {recon}: Z profile too short after NaN-trim — skipping")
+            continue
+
+        # Fit with your existing fitter (returns deconvolved FWHM if bead_diam_nm>0)
+        fwhm_px, popt, r2 = fit_gaussian_and_compute_fwhm(
+            z_clean,
+            bead_diam_nm=bead_diam_nm,
+            pixel_size_nm=pixel_size_nm if bead_diam_nm > 0 else None,
+            title="", plot_fit=False
+        )
+
+        # X for data & fit
+        x = np.arange(z_clean.size, dtype=float)
+        x_dense = np.linspace(x.min(), x.max(), num=max(int(10 * (x.max() - x.min() + 1)), 200))
+        y_fit = gaussian(x_dense, *popt) if np.all(np.isfinite(popt)) else np.full_like(x_dense, np.nan)
+
+        # Normalize to [0,1] using the data's min/max
+        y_data = z_clean.astype(float)
+        if normalize:
+            y_min = float(np.nanmin(y_data))
+            y_span = float(np.nanmax(y_data) - y_min)
+            if y_span > 0:
+                y_data = (y_data - y_min) / y_span
+                if np.isfinite(y_fit).any():
+                    y_fit = (y_fit - y_min) / y_span
+
+        label = recon.rsplit("/", 1)[-1]
+        ax.plot(x, y_data, ".", ms=3.2, alpha=0.9, label=label)
+        if np.isfinite(y_fit).any():
+            ax.plot(x_dense, y_fit, "-", lw=1.2, alpha=0.9)
+
+        # metrics
+        fwhm_nm = (fwhm_px * pixel_size_nm) if (pixel_size_nm is not None and np.isfinite(fwhm_px)) else np.nan
+        results[label] = {
+            "fwhm_px": float(fwhm_px),
+            "fwhm_nm": float(fwhm_nm) if np.isfinite(fwhm_nm) else np.nan,
+            "r2": float(r2),
+            "n": int(z_clean.size),
+        }
+
+        # Print metrics
+        if np.isfinite(fwhm_nm):
+            print(f"[{label}]  Z: FWHM = {fwhm_px:.2f} px  ({fwhm_nm:.1f} nm),  R² = {r2:.3f},  n = {z_clean.size}")
+        else:
+            print(f"[{label}]  Z: FWHM = {fwhm_px:.2f} px,  R² = {r2:.3f},  n = {z_clean.size}")
+
+    ax.set_xlabel("position (px)")
+    ax.set_ylabel("normalized intensity (0–1)" if normalize else "intensity (a.u.)")
+    ax.grid(alpha=0.25)
+    ax.legend(fontsize=8, title="reconstruction", ncol=2)
+
+    if title is None:
+        title = f"{tomogram} | bead {bead_index} | Z profiles (linewidth={linewidth})"
+    ax.set_title(title, fontsize=10)
+
+    if save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=200, bbox_inches="tight")
+
+    return fig, ax, results
