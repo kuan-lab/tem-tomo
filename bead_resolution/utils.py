@@ -682,6 +682,14 @@ import matplotlib.pyplot as plt
 
 def _safe_name(s: str) -> str:
     return "".join(c if c.isalnum() or c in ("_", "-", ".") else "_" for c in s)
+from pathlib import Path
+from typing import Sequence, Tuple, Optional
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+
+def _safe_name(s: str) -> str:
+    return "".join(c if c.isalnum() or c in ("_", "-", ".") else "_" for c in s)
 
 def plot_bead_views_across_recons(
     tomogram: str,
@@ -690,29 +698,33 @@ def plot_bead_views_across_recons(
     root_dir: str | Path = "data",
     *,
     view_axis: str = "YZ",                  # "YZ" or "XZ"
-    rotate_side_90: bool = True,            # rotate side view by 90°
-    clip_percentile: Tuple[float, float] | None = (1, 99),
+    rotate_xy_90: bool = True,             # rotate XY 90°
+    rotate_side_90: bool = True,            # rotate side view 90°
+    clip_percentile: Tuple[float, float] | None = (1, 99),  # per-image
+    nan_bad_color: Optional[Tuple[float,float,float,float]] = (0.5,0.5,0.5,1.0),
     cmap: str = "gray",
     title: str | None = None,
     save_path: str | Path | None = None,
+    titles: Optional[Sequence[str]] = None,
 ):
     """
-    Plot a horizontal grid (2 rows × N columns): top=XY, bottom=(YZ or XZ) for the same bead
-    across multiple reconstructions.
-
-    - Handles NaN-padded ROIs.
-    - Shared contrast per row (XY column shares vmin/vmax; side-view row shares vmin/vmax).
-    - `view_axis` selects which side view to show; `rotate_side_90` rotates that image by 90°.
+    Horizontal grid (2 rows × N cols): top=XY, bottom=(YZ or XZ) for the same bead
+    across multiple reconstructions. Each panel is contrast-adjusted independently
+    using NaN-aware percentiles.
     """
     root_dir = Path(root_dir)
-    items = []
-    failed = []
+    items, failed = [], []
     side_axis = view_axis.upper()
     if side_axis not in ("YZ", "XZ"):
         raise ValueError("view_axis must be 'YZ' or 'XZ'")
 
+    # Colormap with friendlier NaN color
+    cm = mpl.cm.get_cmap(cmap).copy()
+    if nan_bad_color is not None:
+        cm.set_bad(nan_bad_color)
+
     # -------- load slices --------
-    for recon in recon_labels:
+    for idx, recon in enumerate(recon_labels):
         npz_path = root_dir / _safe_name(tomogram) / f"{_safe_name(recon)}.npz"
         if not npz_path.exists():
             failed.append((recon, "missing npz"))
@@ -731,22 +743,24 @@ def plot_bead_views_across_recons(
         Z, Y, X = vol.shape
         zc, yc, xc = Z // 2, Y // 2, X // 2
 
-        # XY at mid-Z
-        img_xy = vol[zc, :, :].astype(float)            # (Y, X)
-
-        # side view selection
-        if side_axis == "YZ":
-            # slice at mid-X → (Z, Y); display as (Y, Z) then optional rotate
+        img_xy = vol[zc, :, :].astype(float)     # (Y, X)
+        if side_axis == "XZ":
             side = vol[:, :, xc].astype(float).transpose(1, 0)  # (Y, Z)
-        else:  # "XZ"
-            # slice at mid-Y → (Z, X); display as (X, Z) then optional rotate
+        else:  # "YZ"
             side = vol[:, yc, :].astype(float).transpose(1, 0)  # (X, Z)
 
+        if rotate_xy_90:
+            img_xy = np.rot90(img_xy, k=1)
         if rotate_side_90:
-            side = np.rot90(side, k=1)  # 90° CCW
+            side = np.rot90(side, k=1)
 
+        panel_title = (titles[idx] if titles is not None
+                        and len(titles) == len(recon_labels)
+                        else recon.rsplit("/", 1)[-1])
+        
         items.append({
-            "label": recon.rsplit("/", 1)[-1],
+            "recon": recon,
+            "label": panel_title,
             "XY": img_xy,
             "SIDE": side,
         })
@@ -757,47 +771,47 @@ def plot_bead_views_across_recons(
             msg += "\n" + "\n".join([f" - {r}: {m}" for r, m in failed])
         raise RuntimeError(msg)
 
-    # -------- shared contrast (NaN-aware) --------
-    def _vrange(key):
+    # per-image vrange
+    def _vrange(arr):
         if clip_percentile is None:
             return (None, None)
-        vec = np.concatenate([np.ravel(it[key]) for it in items])
-        lo = np.nanpercentile(vec, clip_percentile[0])
-        hi = np.nanpercentile(vec, clip_percentile[1])
+        lo = np.nanpercentile(arr, clip_percentile[0])
+        hi = np.nanpercentile(arr, clip_percentile[1])
         return float(lo), float(hi)
-
-    v_xy = _vrange("XY")
-    v_side = _vrange("SIDE")
 
     # -------- plot 2 × N --------
     n = len(items)
-    fig, axes = plt.subplots(2, n, figsize=(2.2 * n, 4.6), constrained_layout=True)
+    fig, axes = plt.subplots(2, n, figsize=(2 * n, 4), constrained_layout=True)
     if n == 1:
-        axes = np.array([[axes[0]], [axes[1]]])  # force (2,1)
+        axes = np.array([[axes[0]], [axes[1]]])  # (2,1)
 
     for j, it in enumerate(items):
         ax_xy = axes[0, j]
         ax_sd = axes[1, j]
 
-        ax_xy.imshow(it["XY"], cmap=cmap, origin="lower",
+        v_xy = _vrange(it["XY"])
+        v_sd = _vrange(it["SIDE"])
+
+        ax_xy.imshow(it["XY"], cmap=cm, origin="lower",
                      vmin=None if v_xy[0] is None else v_xy[0],
                      vmax=None if v_xy[1] is None else v_xy[1])
-        ax_sd.imshow(it["SIDE"], cmap=cmap, origin="lower",
-                     vmin=None if v_side[0] is None else v_side[0],
-                     vmax=None if v_side[1] is None else v_side[1])
+        ax_sd.imshow(it["SIDE"], cmap=cm, origin="lower",
+                     vmin=None if v_sd[0] is None else v_sd[0],
+                     vmax=None if v_sd[1] is None else v_sd[1])
 
-        ax_xy.set_title(it["label"], fontsize=9)
-        ax_sd.set_title("")  # clean
+        ax_xy.set_title(it["label"], fontsize=16)
+        ax_sd.set_title("")
         for ax in (ax_xy, ax_sd):
             ax.set_xticks([]); ax.set_yticks([])
 
-    # row labels on left
-    axes[0, 0].set_ylabel("XY", fontsize=10)
-    axes[1, 0].set_ylabel(side_axis, fontsize=10)
+    axes[0, 0].set_ylabel("XY", fontsize=16)
+    axes[1, 0].set_ylabel(side_axis, fontsize=16)
 
     if title is None:
-        title = f"{tomogram}  |  bead {bead_index}  |  side={side_axis}{' (rot90)' if rotate_side_90 else ''}"
-    fig.suptitle(title, fontsize=11)
+        rot_xy = "rot90" if rotate_xy_90 else "0°"
+        rot_sd = "rot90" if rotate_side_90 else "0°"
+        title = f"{tomogram}  |  bead {bead_index}  |  side={side_axis} (XY {rot_xy}, SIDE {rot_sd})"
+    fig.suptitle(title, fontsize=16)
 
     if failed:
         print("Skipped recons:")
@@ -811,12 +825,18 @@ def plot_bead_views_across_recons(
 
     return fig, axes
 
+
 from pathlib import Path
 from typing import Sequence, Dict, Any
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Sequence, Dict, Any
+import numpy as np
+import matplotlib.pyplot as plt
+
+from pathlib import Path
+from typing import Sequence, Dict, Any, List, Optional
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -833,11 +853,14 @@ def plot_z_profiles_across_recons(
     title: str | None = None,
     save_path: str | Path | None = None,
     normalize: bool = True,               # normalize y to [0,1] per profile
+    y_offset_step: float = 0.2,           # NEW: vertical offset added per recon (0, 0.2, 0.4, …)
+    palette: Optional[List[str]] = None,  # NEW: colors for (dots, line) per recon; defaults to mpl cycle
 ) -> tuple[plt.Figure, plt.Axes, Dict[str, Dict[str, Any]]]:
     """
     Plot Z centerline profiles + Gaussian fits for the same bead across multiple recons.
-    - NaN-padded ROIs are handled by trimming NaN edges before fitting.
-    - Each recon is plotted in a different color; fits are overlaid.
+    - NaN-padded ROIs handled by trimming NaN edges before fitting.
+    - Each recon plotted in a distinct color; dots and fit line share the color.
+    - Traces are vertically offset by y_offset_step per recon for readability.
     - Prints R² and FWHM (px and, if available, nm) to stdout.
 
     Returns
@@ -847,9 +870,16 @@ def plot_z_profiles_across_recons(
     """
     root_dir = Path(root_dir)
     results: Dict[str, Dict[str, Any]] = {}
-    fig, ax = plt.subplots(1, 1, figsize=(5.6, 3.2), constrained_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=(2, 2), constrained_layout=True)
 
-    for recon in recon_labels:
+    # color palette
+    if palette is None:
+        # Matplotlib default color cycle
+        palette = plt.rcParams["axes.prop_cycle"].by_key().get("color", ["C0","C1","C2","C3","C4","C5","C6","C7","C8","C9"])
+
+    y_max_seen = 0.0
+    for idx, recon in enumerate(recon_labels):
+        color = palette[idx % len(palette)]
         npz_path = root_dir / _safe_name(tomogram) / f"{_safe_name(recon)}.npz"
         if not npz_path.exists():
             print(f"⚠️  {recon}: missing NPZ at {npz_path} — skipping")
@@ -899,10 +929,19 @@ def plot_z_profiles_across_recons(
                 if np.isfinite(y_fit).any():
                     y_fit = (y_fit - y_min) / y_span
 
-        label = recon.rsplit("/", 1)[-1]
-        ax.plot(x, y_data, ".", ms=3.2, alpha=0.9, label=label)
+        # Vertical offset for this recon
+        y_off = idx * float(y_offset_step)
+        y_data_off = y_data + y_off
         if np.isfinite(y_fit).any():
-            ax.plot(x_dense, y_fit, "-", lw=1.2, alpha=0.9)
+            y_fit_off = y_fit + y_off
+        else:
+            y_fit_off = y_fit
+
+        # Plot data (dots) and fit (line) in the same color
+        label = recon.rsplit("/", 1)[-1]
+        ax.plot(x, y_data_off, ".", ms=3.2, alpha=0.9, color=color, label=label)
+        if np.isfinite(y_fit_off).any():
+            ax.plot(x_dense, y_fit_off, "-", lw=1.2, alpha=0.95, color=color)
 
         # metrics
         fwhm_nm = (fwhm_px * pixel_size_nm) if (pixel_size_nm is not None and np.isfinite(fwhm_px)) else np.nan
@@ -919,14 +958,24 @@ def plot_z_profiles_across_recons(
         else:
             print(f"[{label}]  Z: FWHM = {fwhm_px:.2f} px,  R² = {r2:.3f},  n = {z_clean.size}")
 
-    ax.set_xlabel("position (px)")
-    ax.set_ylabel("normalized intensity (0–1)" if normalize else "intensity (a.u.)")
-    ax.grid(alpha=0.25)
-    ax.legend(fontsize=8, title="reconstruction", ncol=2)
+        y_max_seen = max(y_max_seen, np.nanmax(y_data_off))
 
-    if title is None:
-        title = f"{tomogram} | bead {bead_index} | Z profiles (linewidth={linewidth})"
-    ax.set_title(title, fontsize=10)
+    ax.set_xlabel("position (pixels)")
+    ylabel = "intensity (a.u.)"
+    ax.set_ylabel(ylabel if normalize else "intensity (a.u.)")
+    ax.set_yticklabels([])
+    ax.set_xticks([0,18,36])
+    ax.set_xticklabels([-18,0,18])
+    #ax.grid(alpha=0.25)
+    #ax.legend(fontsize=8, title="reconstruction", ncol=2)
+
+    #if title is None:
+    #    title = f"{tomogram} | bead {bead_index} | Z profiles (linewidth={linewidth})"
+    #ax.set_title(title, fontsize=10)
+
+    # Nice y-limits to include the last offset trace comfortably
+    if normalize:
+        ax.set_ylim(-0.05, y_max_seen + 0.25)
 
     if save_path is not None:
         save_path = Path(save_path)
